@@ -1,0 +1,17 @@
+{
+  "functions": {
+    "example/get.php": {
+      "runtime": "vercel-php@0.7.1"
+    }
+  },
+  "routes": [
+    {
+      "src": "/example",
+      "dest": "/example/index.html"
+    },
+    {
+      "src": "/example/(.*)",
+      "dest": "/example/$1"
+    }
+  ]
+}
