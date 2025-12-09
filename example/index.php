@@ -6,7 +6,7 @@
 
 // If this is a POST request, handle it as an API call
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    require __DIR__ . '/get.php';
+    require_once dirname(__FILE__) . '/get.php';
     exit;
 }
 
@@ -1573,7 +1573,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 try {
-                    const response = await fetch(`get.php?message=${encodeURIComponent(uid)}&action=${encodeURIComponent(action)}`, {
+                    const response = await fetch(`${window.location.pathname}?message=${encodeURIComponent(uid)}&action=${encodeURIComponent(action)}`, {
                         method: 'POST',
                         body: payload,
                     });
