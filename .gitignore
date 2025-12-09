@@ -1,0 +1,11 @@
+/.vscode/
+/vendor/
+php-ymap.code-workspace
+ISSUES.md
+.idea/
+node_modules/
+coverage/
+.phpunit.result.cache
+phpstan.cache
+*.log
+composer.lock

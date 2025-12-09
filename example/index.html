@@ -1,0 +1,1896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Live demo of php-ymap - a modern PHP 8.1+ IMAP library. Connect to any IMAP server, search/filter emails, manage message flags, and preview attachments with this lightweight, AJAX-powered interface.">
+    <title>php-ymap Demo - Modern PHP IMAP Library</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #172131;
+            --border: #334155;
+            --loading-border: #374c6e;
+            --text: #f1f5f9;
+            --muted: #cbd5e1;
+            --accent: #73a6f9;
+            --accent-hover: #2563eb;
+            --success: #22c55e;
+            --error: #ff7979;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html {
+            scrollbar-gutter: stable;
+        }
+
+        body {
+            background: radial-gradient( circle at 20% 80%, rgba(59, 130, 246, 0.05) 0%, transparent 50% ), radial-gradient( circle at 80% 20%, rgba(139, 92, 246, 0.05) 0%, transparent 50% ), var(--bg);
+            background-attachment: fixed;
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 2rem;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: radial-gradient(circle at 25% 25%, rgba(59, 130, 246, 0.03) 0%, transparent 50%), radial-gradient(circle at 75% 75%, rgba(139, 92, 246, 0.03) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        body.modal-open {
+            overflow: hidden;
+        }
+
+        header {
+            margin: 0 auto;
+            padding: 0 2rem;
+            max-width: 1200px;
+            line-height: 1;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 0;
+            letter-spacing: 0.02em;
+            background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        main {
+            margin: 0 auto;
+            padding: 0 2rem;
+            max-width: 1200px;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            margin-bottom: 2rem;
+            font-size: 1.05rem;
+            padding-top: .75rem;
+            margin-top: .75rem;
+            border-top: 1px solid #88899955;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid rgba(51, 65, 85, 0.7);
+            border-radius: 18px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 20px 45px rgba(15, 23, 42, 0.35);
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .imap-card-header {
+            min-height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card:hover {
+            border-color: rgba(59, 130, 246, 0.3);
+            box-shadow: 0 25px 55px rgba(15, 23, 42, 0.45);
+        }
+
+        body.imap-loading .card.connection,
+        body.imap-loading .loading {
+            border-color: var(--accent);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+            animation: pulse-border 2.5s ease-in-out infinite;
+        }
+
+        body.imap-loading .card.connection {
+            position: relative;
+            overflow: hidden;
+        }
+
+        body.imap-loading .card.connection::after {
+            content: '';
+            position: absolute;
+            z-index: 1;
+            inset: 0;
+            background: linear-gradient(90deg, transparent 0%, rgba(59, 130, 246, 0.1) 50%, transparent 100% );
+            transform: translateX(-100%);
+            animation: shimmer 2.5s infinite;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        table thead tr {
+            border-bottom: 2px solid var(--border);
+        }
+
+        table tbody tr:not(:last-of-type) {
+            border-bottom: 1px solid var(--border);
+        }
+
+        table th,
+        table td {
+            text-align: left;
+            padding: 0.75rem;
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        table td {
+            padding: 0.75rem;
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        table td code {
+            background: var(--bg);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            color: #a78bfa;
+            white-space: nowrap;
+        }
+
+        table td[title] {
+            cursor: help;
+        }
+
+        textarea {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            min-height: 70px;
+            resize: vertical;
+        }
+
+        .hint {
+            font-size: 0.75rem;
+            color: var(--muted);
+            margin-top: 0.25rem;
+        }
+
+        .form-group { margin-bottom: 1rem; }
+
+        label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--muted);
+        }
+
+        input[type="text"],
+        input[type="password"],
+        input[type="number"],
+        input[type="date"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 0.8rem 1rem;
+            border: 2px solid transparent;
+            border-radius: 12px;
+            color: var(--text);
+            font-size: 1rem;
+            position: relative;
+            z-index: 4;
+            background: linear-gradient(var(--bg), var(--bg)) padding-box, linear-gradient(135deg, var(--accent), #8b5cf6) border-box;
+            transition: box-shadow 0.3s;
+        }
+
+        select { cursor: pointer; background-position: 0 0, 0 0; }
+        select option { background: var(--bg); }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus,
+        input[type="number"]:focus,
+        input[type="date"]:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+
+        .form-row .form-group { margin-bottom: 0; }
+
+        .form-search-in-row,
+        .btn-group.submit-buttons {
+            margin-top: 1rem;
+        }
+
+        .btn-group.submit-buttons {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .section-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 1.5rem 0 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+
+        button {
+            background: var(--surface);
+            color: var(--text);
+            padding: 0.85rem 1.6rem;
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s, box-shadow 0.2s;
+        }
+
+        button:hover { box-shadow: 0 5px 20px rgba(59, 130, 246, 0.2); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        button[type="submit"] {
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            border: none;
+            color: #fff;
+            box-shadow: 0 0 18px 6px rgba(59, 130, 246, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        button[type="submit"]::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent );
+            transition: left 0.6s;
+        }
+
+        button[type="submit"]:hover::before {
+            left: 100%;
+        }
+
+        .password-wrapper {
+            position: relative;
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 0.75rem;
+            top: 50%;
+            z-index: 5;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            padding: 0.25rem;
+            font-size: 1.1rem;
+            line-height: 1;
+        }
+
+        .password-toggle:hover { color: var(--accent); background: transparent; }
+
+        .action-btn {
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.35);
+            color: var(--text);
+            padding: 0.5rem 0.9rem;
+            font-size: 0.85rem;
+            border-radius: 10px;
+            transition: background 0.3s;
+        }
+
+        .action-btn:hover,
+        .action-btn.btn-active {
+            background: rgba(59, 130, 246, 0.25);
+        }
+
+        .action-btn.secondary {
+            border-color: rgba(239, 68, 68, 0.5);
+            color: var(--error);
+            background: rgba(166, 45, 45, 0.1);
+        }
+
+        .action-btn.secondary:hover {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fee2e2;
+        }
+
+        .btn-group { display: flex; gap: 0.5rem; margin-top: 1rem; }
+
+        footer nav {
+            padding: 1rem 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        footer nav a {
+            display: block;
+            padding: 0 15px;
+            color: var(--text);
+        }
+
+        footer nav a:not(:last-of-type) {
+            box-shadow: 1px 0 0px 0px #7d88f826;
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+
+        .alert.error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--error);
+            color: var(--error);
+        }
+
+        .alert.success {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid var(--success);
+            color: var(--success);
+        }
+
+        .search-criteria {
+            background: var(--bg);
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            color: var(--muted);
+            margin-top: 0.5rem;
+            font-family: monospace;
+        }
+
+        .message {
+            background: var(--surface);
+            border: 1px solid rgba(51, 65, 85, 0.85);
+            border-radius: 16px;
+            padding: 1.25rem 1.5rem 1rem;
+            margin-bottom: 1.25rem;
+            position: relative;
+            overflow: hidden;
+            border-left: 5px solid transparent;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .message::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, transparent 0%, rgba(59, 130, 246, 0.08) 100%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .message > * {
+            position: relative;
+            z-index: 2;
+        }
+
+        .message:hover {
+            /* border-color: rgba(59, 130, 246, 0.5); */
+            box-shadow: 0 20px 45px rgba(15, 23, 42, 0.35);
+        }
+
+        .message.message--read:hover {
+            border-color: rgba(34, 197, 94, .3);
+            box-shadow: 0 20px 45px rgba(15, 23, 42, 0.35);
+        }
+
+        .message:hover::before {
+            opacity: 1;
+        }
+
+        .message--unread {
+            border-left-color: var(--accent);
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), transparent);
+        }
+
+        .message--read {
+            border-left-color: rgba(59, 130, 246, 0.15);
+        }
+
+        .message--answered {
+            box-shadow: 0 0 18px 2px rgba(59, 225, 246, .3);
+        }
+
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .message-subject {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--text);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .message-subject::before {
+            content: '▼';
+            display: inline-block;
+            margin-right: 0.5rem;
+            font-size: 0.7rem;
+            transition: transform 0.2s;
+        }
+
+        .message-subject.collapsed::before { transform: rotate(-90deg); }
+
+        .message-date {
+            font-size: 0.8rem;
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        .message-status-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin-top: 0.35rem;
+        }
+
+        .message-status {
+            position: relative;
+            display: inline-flex;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 2px 0.9rem 0 1.9rem;
+            border-radius: 999px;
+            letter-spacing: 0.05em;
+            line-height: 1;
+            border: 1px solid transparent;
+            min-height: 26px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .message-status::before {
+            content: '';
+            position: absolute;
+            left: 0.8rem;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 1rem;
+            height: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+        }
+
+        .message-status.read {
+            background: rgba(34, 197, 94, 0.12);
+            color: var(--success);
+            border-color: rgba(34, 197, 94, 0.4);
+        }
+
+        .message-status.read::before {
+            content: '✓';
+            font-size: 0.8rem;
+            transform: translateY(-45%);
+        }
+
+        .message-status.unread {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent);
+            border-color: rgba(59, 130, 246, 0.4);
+        }
+
+        .message-status.unread::before {
+            content: '●';
+            font-size: 0.6rem;
+            transform: translateY(-45%);
+        }
+
+        .message-status.answered {
+            background: rgba(59, 130, 246, 0.2);
+            color: #bfdbfe;
+            border-color: rgba(59, 130, 246, 0.45);
+        }
+
+        .message-status.answered::before {
+            content: '↩';
+            font-size: 0.8rem;
+            transform: translateY(-40%) rotate(-45deg);
+        }
+
+        .message-status.unanswered {
+            background: rgba(148, 163, 184, 0.2);
+            color: var(--muted);
+            border-color: rgba(148, 163, 184, 0.4);
+        }
+
+        .message-status.unanswered::before {
+            content: '…';
+            font-size: 0.9rem;
+            transform: translateY(-55%);
+        }
+
+        .message-meta-wrapper {
+            display: flex;
+            gap: 1rem;
+            line-height: 1;
+        }
+
+        .message-meta {
+            display: flex;
+            font-size: 0.875rem;
+            color: var(--muted);
+        }
+
+        .message-meta strong {
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        .message-body {
+            --muted: var(--text);
+            font-size: 0.9rem;
+            color: var(--muted);
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 200px;
+            overflow-y: auto;
+            transition: max-height 0.3s, padding 0.3s, margin 0.3s;
+        }
+
+        .message-body.collapsed {
+            max-height: 0;
+            padding: 0;
+            margin: 0;
+            border: none;
+            overflow: hidden;
+        }
+
+        .messages-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .message-actions {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid var(--border);
+        }
+
+        .message-actions .action-btn {
+            padding: 0.5rem 0.9rem;
+            font-size: 0.8rem;
+            background: rgba(59, 130, 246, 0.12);
+        }
+
+        .message-actions select {
+            padding: 0.5rem .75rem;
+            min-width: 140px;
+        }
+
+        .message-flags {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .address-link {
+            margin-left: 8px;
+            max-width: 220px;
+            display: inline-block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            text-decoration: none;
+            color: inherit;
+            border-bottom: 1px dashed transparent;
+            transition: border-color 0.2s, color 0.2s;
+        }
+
+        .address-link:hover {
+            color: var(--accent);
+            border-bottom-color: currentColor;
+        }
+
+        .attachments { margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+        .attachment-badge {
+            background: rgba(139, 92, 246, 0.2);
+            color: #a78bfa;
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .attachment-badge:hover {
+            background: rgba(139, 92, 246, 0.3);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+        }
+
+        .empty-state {
+            padding: 2rem;
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.5), transparent);
+            border: 2px dashed rgba(225, 49, 49, .8);
+            border-radius: 16px;
+            position: relative;
+            overflow: hidden;
+            text-align: center;
+        }
+
+        .empty-state::before {
+            content: '📭';
+            font-size: 3rem;
+            display: block;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .empty-state::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, transparent 0%, rgba(59, 130, 246, 0.03) 100%);
+            pointer-events: none;
+        }
+
+        code {
+            background: var(--bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: #a78bfa;
+        }
+
+        .loading {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--surface);
+            border: 2px solid var(--loading-border);
+            border-radius: 12px;
+            padding: 1rem 2rem;
+            color: var(--muted);
+            z-index: 1000;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .loading.active { display: flex; align-items: center; gap: 1rem; }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 2rem;
+            background: var(--success);
+            color: white;
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            font-weight: 500;
+            opacity: 0;
+            transform: translateY(1rem);
+            transition: all 0.3s;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .toast.show { opacity: 1; transform: translateY(0); }
+
+        body.yvp-is-scrolled .toast { right: 5.5rem; }
+
+        #messagesContainer, #statusContainer { display: none; }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1500;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(4, 20, 57, .5);
+            backdrop-filter: blur(8px);
+        }
+
+        .modal-content {
+            padding: 1.75rem;
+            width: 100%;
+            max-width: calc(1200px - 4rem);
+            max-height: 90vh;
+            position: relative;
+            z-index: 2;
+            overflow-y: auto;
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95) );
+            border: 1px solid rgba(59, 130, 246, 0.35);
+            border-radius: 20px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(18px);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: transparent;
+            border: none;
+            color: var(--muted);
+            font-size: 1.25rem;
+            cursor: pointer;
+        }
+
+        .modal-close:hover { color: var(--accent); }
+
+        .modal-body {
+            margin-top: 1rem;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 16px;
+            padding: 1rem;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 1rem;
+            white-space: pre-wrap;
+            line-height: 1.5;
+            max-height: 55vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            align-items: flex-start;
+            margin-bottom: 0.5rem;
+        }
+
+        .modal-header h3 {
+            margin: 0 0 0.25rem 0;
+            font-size: 1.2rem;
+        }
+
+        .modal-meta > div {
+            display: flex;
+        }
+
+        .modal-meta {
+            display: flex;
+            flex-wrap: wrap;
+            flex-direction: column;
+            gap: .3rem;
+            font-size: 0.85rem;
+            color: var(--muted);
+        }
+
+        .modal-meta strong { min-width: 90px; color: var(--text); }
+
+        .scroll-to-top-container {
+            padding: 0;
+            position: fixed;
+            bottom: 1.5rem;
+            right: 20px;
+            z-index: 1005;
+        }
+
+        .scroll-to-top {
+            width: 50px;
+            height: 50px;
+            padding: 0;
+            border-radius: 50%;
+            border: none;
+            color: #fff;
+            font-size: 1.2rem;
+            line-height: 1;
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            box-shadow: 0 10px 30px rgba(59, 130, 246, 0.2);
+            opacity: 0;
+            transform: translateY(1rem);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+        }
+
+        body.yvp-is-scrolled .scroll-to-top {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .y-toggle-target {
+            max-height: 2000px;
+            overflow: hidden;
+            opacity: 1;
+            transition: max-height .4s ease-in-out, opacity .4s ease-in-out, padding .4s, margin .4s;
+        }
+        .y-toggle-target.toggle-not-active {
+            max-height: 0;
+            opacity: 0;
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @keyframes pulse-border {
+            0%, 100% { box-shadow: 0 0 10px rgba(59, 130, 246, 0.2); }
+            50% { box-shadow: 0 0 25px rgba(59, 130, 246, 0.5); }
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1><a href="./">📬 php-ymap Demo</a></h1>
+        <p class="subtitle">A lightweight IMAP library for PHP 8.1+</p>
+    </header>
+    <main class="container" id="app">
+        <div class="card connection">
+            <h2 style="margin-bottom: 1rem; font-size: 1.25rem;">Connection Settings</h2>
+            <form id="imapForm" data-submit="search">
+                <div class="form-group">
+                    <label for="mailbox">Mailbox Path</label>
+                    <input type="text" id="mailbox" name="mailbox"
+                           value="{imap.gmail.com:993/imap/ssl}INBOX"
+                           placeholder="{imap.gmail.com:993/imap/ssl}INBOX"
+                           required>
+                </div>
+                <div class="form-group">
+                    <label for="username">Username / Email</label>
+                    <input type="text" id="username" name="username"
+                        placeholder="your-email@gmail.com"
+                        autocomplete="username"
+                        required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password / App Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="password" name="password"
+                            placeholder="Generated app password"
+                            autocomplete="current-password"
+                            required>
+                        <button type="button"
+                            class="password-toggle"
+                            data-action="togglePassword"
+                            title="Toggle password visibility"
+                            data-toggle-content="📛">👀</button>
+                    </div>
+                </div>
+
+                <div class="btn-group">
+                    <button type="button" class="action-btn" data-action="saveCredentials">💾 Save Credentials</button>
+                    <button type="button" class="action-btn" data-action="loadCredentials">📂 Load Saved</button>
+                    <button type="button" class="action-btn secondary" data-action="clearCredentials">🗑️ Clear Saved</button>
+                </div>
+
+                <div class="section-title">🔍 Filters</div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="limit">Limit</label>
+                        <input type="number" id="limit" name="limit" value="10" min="1" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label for="read_status">Read Status</label>
+                        <select id="read_status" name="read_status">
+                            <option value="ALL">All</option>
+                            <option value="UNREAD">Unread</option>
+                            <option value="READ">Read</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="answered_status">Answered Status</label>
+                        <select id="answered_status" name="answered_status">
+                            <option value="ALL">All</option>
+                            <option value="UNANSWERED">Unanswered</option>
+                            <option value="ANSWERED">Answered</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="date_from">From Date</label>
+                        <input type="date" id="date_from" name="date_from">
+                    </div>
+                    <div class="form-group">
+                        <label for="date_to">To Date</label>
+                        <input type="date" id="date_to" name="date_to">
+                    </div>
+                </div>
+
+                <div class="form-row form-search-in-row">
+                    <div class="form-group">
+                        <label for="search_field">Search In</label>
+                        <select id="search_field" name="search_field">
+                            <option value="ALL">All Fields</option>
+                            <option value="SUBJECT">Subject</option>
+                            <option value="FROM">From</option>
+                            <option value="TO">To</option>
+                            <option value="BODY">Body</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label for="search_text">Search Text</label>
+                        <input type="text" id="search_text" name="search_text" placeholder="Enter search term...">
+                    </div>
+                </div>
+
+                <div class="btn-group submit-buttons">
+                    <button type="submit" id="submitBtn" style="flex: 1;">Connect & Search</button>
+                    <button type="button"
+                        data-action="toggleTarget"
+                        data-target=".advanced-options"
+                        data-toggle-class="toggle-not-active"
+                        data-toggle-class-self="btn-active"
+                        data-toggle-tate="inactive"
+                        class="action-btn">
+                        ⚙️ More Options
+                    </button>
+                    <button type="button" class="action-btn secondary" data-action="clearFilters">Clear Filters</button>
+                </div>
+
+                <div class="advanced-options y-toggle-target toggle-not-active" id="advancedOptions">
+                    <div class="section-title">Advanced Options</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="body_length">Body Preview Length (characters)</label>
+                            <input type="number" id="body_length" name="body_length" value="500" min="50" max="20000">
+                            <div class="hint">Controls how much of the message body is shown in cards. Full text is always available in the modal.</div>
+                        </div>
+                    </div>
+
+                    <div class="section-title">🚫 Exclusion Filters</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="exclude_from">Exclude From (one per line)</label>
+                            <textarea id="exclude_from" name="exclude_from" rows="3" placeholder="noreply@&#10;newsletter@&#10;quora.com"></textarea>
+                            <div class="hint">Pattern matches: "quora.com" excludes all Quora emails</div>
+                        </div>
+                        <div class="form-group">
+                            <label for="exclude_subject">Exclude Subject Contains (one per line)</label>
+                            <textarea id="exclude_subject" name="exclude_subject" rows="3" placeholder="unsubscribe&#10;Promotion&#10;Newsletter"></textarea>
+                            <div class="hint">Case-insensitive matching</div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div id="statusContainer"></div>
+
+        <div id="messagesContainer">
+            <div class="messages-header">
+                <h2 style="font-size: 1.25rem;">Messages</h2>
+                <div>
+                    <button type="button"
+                        class="action-btn"
+                        data-action="toggleTarget"
+                        data-target=".message-body,.message-subject"
+                        data-target-all
+                        data-toggle-class="collapsed"
+                        data-toggle-class-self="expanded"
+                        data-toggle-content-self="Expand All"
+                        >
+                        Collapse All
+                    </button>
+                </div>
+            </div>
+            <div id="messagesList"></div>
+        </div>
+
+        <div class="modal" id="messageModal">
+            <div class="modal-overlay" data-action="closeModal"></div>
+            <div class="modal-content">
+                <button type="button" class="modal-close" data-action="closeModal" aria-label="Close">✕</button>
+                <div class="modal-header">
+                    <h3 id="modalSubject"></h3>
+                </div>
+                <div class="modal-meta" id="modalMeta"></div>
+                <div class="modal-body" id="modalBody"></div>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <span>Connecting and fetching messages...</span>
+        </div>
+
+        <!-- Imap provider -->
+        <div class="card imap-card">
+            <div class="imap-card-header">
+                <h3>IMAP Provider</h3>
+                <button
+                    class="action-btn"
+                    data-action="toggleTarget"
+                    data-target="[data-targeted='maps']"
+                    data-toggle-class="toggle-not-active"
+                    data-toggle-class-self="btn-active"
+                    data-toggle-content-self="Hide"
+                    data-toggle-callback="formatImapProviders"
+                    data-toggle-callback-once>
+                    Show
+                </button>
+            </div>
+            <div data-targeted="maps" class="y-toggle-target toggle-not-active">
+                <pre id="y-known-imap-providers">{
+                "imapProviders": [
+                    {
+                        "name": "Gmail / Google Workspace",
+                        "host": "imap.gmail.com:993",
+                        "mailbox": "{imap.gmail.com:993/imap/ssl/novalidate-cert}INBOX",
+                        "boxes": ["INBOX", "[Gmail]/Sent Mail", "[Gmail]/Drafts", "[Gmail]/Spam", "[Gmail]/Trash"],
+                        "notes": "Requires App Password (2FA enabled) or OAuth2 for Google Workspace"
+                    },{
+                        "name": "Outlook.com / Hotmail / Office 365",
+                        "host": "outlook.office365.com:993",
+                        "mailbox": "{outlook.office365.com:993/imap/ssl/novalidate-cert}INBOX",
+                        "boxes": ["INBOX", "Sent", "Drafts", "Junk", "Trash", "Archive"],
+                        "notes": "Works with normal password or App Password"
+                    },{
+                        "name": "Microsoft Exchange (on-prem or hybrid)",
+                        "host": "mail.yourcompany.com:993",
+                        "mailbox": "{mail.yourcompany.com:993/imap/ssl/novalidate-cert}INBOX",
+                        "boxes": ["INBOX", "Sent Items", "Drafts", "Junk Email", "Deleted Items"],
+                        "notes": "Replace with your actual domain. Often needs /novalidate-cert"
+                    },{
+                        "name": "iCloud",
+                        "host": "imap.mail.me.com:993",
+                        "mailbox": "{imap.mail.me.com:993/imap/ssl/novalidate-cert}INBOX",
+                        "boxes": ["INBOX", "Sent Messages", "Drafts", "Junk", "Trash", "Archive"],
+                        "notes": "Use Apple ID + App-Specific Password"
+                    },{
+                        "name": "Yahoo Mail",
+                        "host": "imap.mail.yahoo.com:993",
+                        "mailbox": "{imap.mail.yahoo.com:993/imap/ssl/novalidate-cert}INBOX",
+                        "boxes": ["INBOX", "Sent", "Draft", "Bulk", "Trash", "Archive"],
+                        "notes": "Requires App Password (under Account Security)"
+                    },{
+                        "name": "AOL Mail",
+                        "host": "imap.aol.com:993",
+                        "mailbox": "{imap.aol.com:993/imap/ssl/novalidate-cert}INBOX",
+                        "boxes": ["INBOX", "Sent", "Saved", "Spam", "Trash"],
+                        "notes": "Use App Password"
+                    },{
+                        "name": "1&1 IONOS (DE/UK/ES)",
+                        "host": "imap.ionos.de:993",
+                        "mailbox": "{imap.ionos.de:993/imap/ssl/novalidate-cert}INBOX",
+                        "boxes": ["INBOX", "Sent", "Drafts", "Spam", "Trash"],
+                        "notes": "Also works: imap.ionos.co.uk, imap.ionos.es, imap.ionos.com"
+                    },{
+                        "name": "Strato",
+                        "host": "imap.strato.de:993",
+                        "mailbox": "{imap.strato.de:993/imap/ssl/novalidate-cert}INBOX",
+                        "boxes": ["INBOX", "Sent", "Drafts", "Spam", "Trash"]
+                    },{
+                        "name": "GMX",
+                        "host": "imap.gmx.net:993",
+                        "mailbox": "{imap.gmx.net:993/imap/ssl/novalidate-cert}INBOX",
+                        "boxes": ["INBOX", "Sent", "Drafts", "Spam", "Trash"],
+                        "notes": "Also: imap.gmx.com"
+                    },{
+                        "name": "WEB.DE",
+                        "host": "imap.web.de:993",
+                        "mailbox": "{imap.web.de:993/imap/ssl/novalidate-cert}INBOX",
+                        "boxes": ["INBOX", "Gesendet", "Entwürfe", "Spam", "Papierkorb"]
+                    },{
+                        "name": "hosteurope / PlusServer",
+                        "host": "imap.hosteurope.de:993",
+                        "mailbox": "{imap.hosteurope.de:993/imap/ssl/novalidate-cert}INBOX",
+                        "boxes": ["INBOX", "Sent", "Drafts", "Trash"]
+                    },{
+                        "name": "All-inkl",
+                        "host": "imap.all-inkl.com:993",
+                        "mailbox": "{imap.all-inkl.com:993/imap/ssl/novalidate-cert}INBOX",
+                        "boxes": ["INBOX", "Sent", "Drafts", "Trash"]
+                    },{
+                        "name": "Zoho Mail",
+                        "host": "imap.zoho.eu:993",
+                        "mailbox": "{imap.zoho.eu:993/imap/ssl/novalidate-cert}INBOX",
+                        "boxes": ["INBOX", "Sent", "Drafts", "Spam", "Trash"],
+                        "notes": "Use imap.zoho.com (US) or imap.zoho.eu / .au / .in depending on region"
+                    }
+                ]}</pre>
+            </div>
+        </div>
+
+        <!-- Usage notes -->
+        <div class="card">
+            <h3>Usage Notes</h3>
+            <ul style="color: var(--muted); padding-top: 0.5rem; padding-left: 1.25rem;">
+                <li>For Gmail, use an <strong>App Password</strong> (not your regular password)</li>
+                <li>Enable IMAP in your email settings</li>
+                <li>This demo uses <code>FT_PEEK</code> so messages won't be marked as read</li>
+                <li>Click on email addresses to open a new draft via mailto</li>
+                <li>Click message subjects to expand/collapse the body</li>
+            </ul>
+        </div>
+
+        <!-- Credits -->
+        <div class="card">
+            <h3 style="margin-bottom: 0.5rem;">⚡ Powered by YEH</h3>
+            <p style="color: var(--muted); margin-bottom: 0.75rem;">
+                This demo uses <strong>YEH</strong> (Yai Event Hub) - a lightweight event delegation library for modern web apps.
+            </p>
+            <ul style="color: var(--muted); padding-left: 1.25rem; margin-bottom: 0;">
+                <li><a href="https://yaijs.github.io/yai" target="_blank" rel="noopener" style="color: #a78bfa;">GitHub: yaijs/yai</a> — The Yai toolkit</li>
+                <li><a href="https://yaijs.github.io/yai/docs/yeh/" target="_blank" rel="noopener" style="color: #a78bfa;">YEH Documentation</a> — Events made simple</li>
+            </ul>
+        </div>
+
+        <div class="scroll-to-top-container">
+            <button type="button" class="scroll-to-top" data-action="scrollToTop">▲</button>
+        </div>
+    </main>
+
+    <footer>
+        <nav>
+            <a href="https://yaijs.github.io/yai" target="_blank" rel="noopener">YAI</a>
+            <a href="https://yaijs.github.io/yai/docs/yeh" target="_blank" rel="noopener">YEH</a>
+        </nav>
+    </footer>
+
+    <div class="toast" id="toast"></div>
+
+    <script type="module">
+        /**
+         * YEH-based Interactive Handler for php-ymap Demo
+         * Complete separation: Pure HTML + AJAX to PHP API
+         */
+        import { YEH } from 'https://cdn.jsdelivr.net/npm/@yaijs/core@1.1.1/yeh/yeh.js';
+        import { YaiViewport } from 'https://cdn.jsdelivr.net/npm/@yaijs/core@1.1.1/utils/yai-viewport.min.js';
+
+        // Works out of the box, toggles <body> to: `yvp-is-scrolled` on scroll
+        new YaiViewport({ throttle: { scroll: 250 }, threshold: { pageScrolled: 150 } });
+
+        // Imap handler
+        class ImapHandler extends YEH {
+            constructor() {
+                super({ '#app': ['click', 'input', 'submit'] }, {}, {
+                    autoTargetResolution: true,
+                });
+                this.storageKey = 'phpYmapCredentials';
+                this.messageCache = new Map();
+                this.defaultBodyLength = 5000;
+                this.init();
+            }
+
+            init() {
+                this.loadCredentials();
+            }
+
+            handleClick(event, target, container) {
+                // container is the selector set in the super
+                // constructor. In this case, it will be `#app`
+                const action = target.dataset.action;
+                if (action && this[action]) this[action](target, event, container);
+            }
+
+            handleInput(event, target, container) {
+                const input = target.dataset.input;
+                if (input && this[input]) this[input](target, event, container);
+            }
+
+            handleSubmit(event, target, container) {
+                const submit = target.dataset.submit;
+                if (submit && this[submit]) this[submit](target, event, container);
+            }
+
+            // AJAX Search
+            async search(form, event) {
+                event.preventDefault();
+
+                const submitBtn = document.getElementById('submitBtn');
+                const loading = document.getElementById('loading');
+                const statusContainer = document.getElementById('statusContainer');
+                const messagesContainer = document.getElementById('messagesContainer');
+                const connectionCard = form.closest('.card');
+
+                submitBtn.disabled = true;
+                loading.classList.add('active');
+                document.body.classList.add('imap-loading');
+                statusContainer.style.display = 'none';
+                messagesContainer.style.display = 'none';
+
+                try {
+                    const response = await fetch('get.php', {
+                        method: 'POST',
+                        body: new FormData(form)
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.showStatus('success',
+                            `✓ Connected! Found ${data.count} of ${data.totalFound} message(s).`,
+                            data.searchCriteria !== 'ALL' ? data.searchCriteria : null
+                        );
+                        this.renderMessages(data.messages);
+                    } else {
+                        this.showStatus('error', data.error);
+                    }
+                } catch (e) {
+                    this.showStatus('error', 'Network error: ' + e.message);
+                } finally {
+                    submitBtn.disabled = false;
+                    loading.classList.remove('active');
+                    document.body.classList.remove('imap-loading');
+                }
+            }
+
+            showStatus(type, message, criteria = null) {
+                const container = document.getElementById('statusContainer');
+                container.style.display = 'block';
+                container.innerHTML = `
+                    <div class="alert ${type}">
+                        ${this.escapeHtml(message)}
+                        ${criteria ? `<div class="search-criteria">Query: ${this.escapeHtml(criteria)}</div>` : ''}
+                    </div>
+                `;
+            }
+
+            renderMessages(messages) {
+                const container = document.getElementById('messagesContainer');
+                const list = document.getElementById('messagesList');
+                this.messageCache = new Map();
+
+                if (messages.length === 0) {
+                    container.style.display = 'block';
+                    list.innerHTML = `
+                        <div class="card empty-state">
+                            <p>No messages found matching your criteria.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                messages.forEach(msg => {
+                    this.messageCache.set(String(msg.uid), msg);
+                });
+
+                container.style.display = 'block';
+                list.innerHTML = messages.map(msg => this.renderMessage(msg)).join('');
+            }
+
+            renderMessage(msg) {
+                const formatAddrs = addrs => addrs.length ? this.renderAddressLinks(addrs) : '-';
+                const preview = msg.bodyPreview || '';
+                const classes = ['message'];
+                if (!msg.seen) {
+                    classes.push('message--unread');
+                } else {
+                    classes.push('message--read');
+                }
+                if (msg.answered) {
+                    classes.push('message--answered');
+                }
+                const messageClass = classes.join(' ');
+
+                return `
+                    <div class="${messageClass}" data-uid="${msg.uid}">
+                        <div class="message-header">
+                            <div>
+                                <div class="message-subject" data-action="toggleBody">
+                                    ${msg.subject ? this.escapeHtml(msg.subject) : '<em style="color:var(--muted)">(No subject)</em>'}
+                                </div>
+                            </div>
+                            <div class="message-date">${msg.date || 'Unknown'}</div>
+                        </div>
+                        <div class="message-meta-wrapper">
+                            <div class="message-meta">
+                                <strong>From:</strong>
+                                ${formatAddrs(msg.from)}
+                            </div>
+                            ${msg.cc.length ? `
+                                <div class="message-meta">
+                                    <strong>CC:</strong>
+                                    ${formatAddrs(msg.cc)}
+                                </div>
+                            ` : ''}
+                            ${msg.replyTo.length ? `
+                                <div class="message-meta">
+                                    <strong>Reply-To:</strong>
+                                    ${formatAddrs(msg.replyTo)}
+                                </div>
+                            ` : ''}
+                            <div class="message-meta">
+                                <strong>To:</strong>
+                                ${formatAddrs(msg.to)}
+                            </div>
+                        </div>
+                        ${msg.attachments.length ? `
+                            <div class="attachments">
+                                ${msg.attachments.map(att => `
+                                    <span class="attachment-badge">📎 ${this.escapeHtml(att.filename)} (${att.sizeFormatted})</span>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                        ${preview ? `
+                            <div class="message-body expanded">${this.escapeHtml(preview)}${msg.bodyTruncated ? '...' : ''}</div>
+                        ` : ''}
+                        <div class="message-actions">
+                            <div>
+                                <button type="button" class="action-btn" data-action="openModal" data-uid="${msg.uid}">
+                                    🔍 View Full Message
+                                </button>
+                            </div>
+                            ${this.renderStatusBadges(msg)}
+                            <div class="message-flags">
+                                <select name="toggleReadState-for-${msg.uid}" data-input="toggleReadState" data-uid="${msg.uid}">
+                                    ${msg.seen
+                                        ? `
+                                            <option value="read" selected>Read</option>
+                                            <option value="unread">Mark Unread</option>
+                                        `
+                                        : `
+                                            <option value="unread" selected>Unread</option>
+                                            <option value="read">Mark Read</option>
+                                        `}
+                                </select>
+                                <select name="toggleAnswerState-for-${msg.uid}" data-input="toggleAnswerState" data-uid="${msg.uid}">
+                                    ${msg.answered
+                                        ? `
+                                            <option value="answered" selected>Answered</option>
+                                            <option value="unanswered">Mark Unanswered</option>
+                                        `
+                                        : `
+                                            <option value="unanswered" selected>Unanswered</option>
+                                            <option value="answered">Mark Answered</option>
+                                        `}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            escapeHtml(str) {
+                if (!str) return '';
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+
+            stripHtml(str) {
+                if (!str) return '';
+                const div = document.createElement('div');
+                div.innerHTML = str;
+                return div.textContent || '';
+            }
+
+            joinAddresses(list = []) {
+                return list.map(addr => {
+                    if (typeof addr === 'string') {
+                        return addr;
+                    }
+                    const email = addr.email || '';
+                    const name = addr.name || '';
+
+                    return name ? `${name} <${email}>` : email;
+                }).join(', ');
+            }
+
+            renderAddressLinks(list = []) {
+                if (!list.length) {
+                    return '-';
+                }
+
+               return list.map(addr => {
+                    const value = typeof addr === 'string' ? { email: addr, name: null } : addr;
+                    const email = this.escapeHtml(value.email || '');
+                    const name = value.name ? this.escapeHtml(value.name) : null;
+                    const label = name ? `${name} &lt;${email}&gt;` : email;
+
+                    return `<a href="mailto:${email}" class="address-link">${label}</a>`;
+               }).join(', ');
+            }
+
+            renderStatusBadges(msg) {
+                return `
+                    <div class="message-status-group">
+                        <span class="message-status ${msg.seen ? 'read' : 'unread'}">
+                            ${msg.seen ? 'Read' : 'Unread'}
+                        </span>
+                        <span class="message-status ${msg.answered ? 'answered' : 'unanswered'}">
+                            ${msg.answered ? 'Answered' : 'Unanswered'}
+                        </span>
+                    </div>
+                `;
+            }
+
+            // Toggle message body
+            toggleBody(target) {
+                const message = target.closest('.message');
+                const body = message?.querySelector('.message-body');
+                if (body) {
+                    body.classList.toggle('collapsed');
+                    target.classList.toggle('collapsed');
+                }
+            }
+
+            openModal(target) {
+                const uid = target.dataset.uid;
+                if (!uid || !this.messageCache.has(uid)) {
+                    this.showToast('Message not available', true);
+                    return;
+                }
+
+                const modal = document.getElementById('messageModal');
+                const subjectEl = document.getElementById('modalSubject');
+                const metaEl = document.getElementById('modalMeta');
+                const bodyEl = document.getElementById('modalBody');
+                const msg = this.messageCache.get(uid);
+
+                subjectEl.textContent = msg.subject || '(No subject)';
+
+                metaEl.innerHTML = `
+                    <div><strong>Date:</strong> ${this.escapeHtml(msg.date || 'Unknown')}</div>
+                    <div><strong>From:</strong> ${this.escapeHtml(this.joinAddresses(msg.from))}</div>
+                    <div><strong>To:</strong> ${this.escapeHtml(this.joinAddresses(msg.to))}</div>
+                    ${msg.cc?.length ? `<div><strong>CC:</strong> ${this.escapeHtml(this.joinAddresses(msg.cc))}</div>` : ''}
+                    ${msg.replyTo?.length ? `<div><strong>Reply-To:</strong> ${this.escapeHtml(this.joinAddresses(msg.replyTo))}</div>` : ''}
+                    <div><strong>UID:</strong> ${this.escapeHtml(String(msg.uid))}</div>
+                `;
+
+                const bodyText = msg.bodyFull
+                    || (msg.htmlBody ? this.stripHtml(msg.htmlBody) : '');
+
+                bodyEl.textContent = bodyText || '(No body content available)';
+
+                modal.classList.add('show');
+                document.body.classList.add('modal-open');
+            }
+
+            async toggleReadState(target) {
+                if (!target) return;
+
+                const uid = target.dataset.uid;
+                if (!uid) return;
+
+                const cached = this.messageCache.get(String(uid));
+                const previousState = cached && cached.seen ? 'read' : 'unread';
+                const action = target.value === 'read' ? 'mark-read' : 'mark-unread';
+
+                await this.applyMessageAction(target, uid, action, previousState);
+            }
+
+            async toggleAnswerState(target) {
+                if (!target) return;
+
+                const uid = target.dataset.uid;
+                if (!uid) return;
+
+                const cached = this.messageCache.get(String(uid));
+                const previousState = cached && cached.answered ? 'answered' : 'unanswered';
+                const action = target.value === 'answered' ? 'mark-answered' : 'mark-unanswered';
+
+                await this.applyMessageAction(target, uid, action, previousState);
+            }
+
+            async applyMessageAction(target, uid, action, revertValue) {
+                const form = document.getElementById('imapForm');
+                const payload = new FormData(form);
+
+                const loading = document.getElementById('loading');
+                const loadingText = document.querySelector('#loading span');
+                const previousText = loadingText ? loadingText.textContent : null;
+
+                target.disabled = true;
+                loading.classList.add('active', 'loading--inline');
+                document.body.classList.add('imap-loading');
+                if (loadingText) {
+                    loadingText.textContent = 'Updating message...';
+                }
+
+                try {
+                    const response = await fetch(`get.php?message=${encodeURIComponent(uid)}&action=${encodeURIComponent(action)}`, {
+                        method: 'POST',
+                        body: payload,
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Unable to update message');
+                    }
+
+                    const data = await response.json();
+
+                    if (!data.success || !data.message) {
+                        throw new Error(data.error || 'Unable to update message');
+                    }
+
+                    this.messageCache.set(String(uid), data.message);
+
+                    const card = document.querySelector(`.message[data-uid="${uid}"]`);
+                    if (card) {
+                        card.outerHTML = this.renderMessage(data.message);
+                    }
+
+                    const labels = {
+                        'mark-read': 'Read',
+                        'mark-unread': 'Unread',
+                        'mark-answered': 'Answered',
+                        'mark-unanswered': 'Unanswered',
+                    };
+
+                    this.showToast(`Marked as ${labels[action] ?? 'updated'}`);
+                } catch (error) {
+                    target.value = revertValue ?? target.value;
+                    this.showToast(error.message || 'Update failed', true);
+                } finally {
+                    target.disabled = false;
+
+                    loading.classList.remove('active', 'loading--inline');
+                    document.body.classList.remove('imap-loading');
+                    if (loadingText && null !== previousText) {
+                        loadingText.textContent = previousText;
+                    }
+                }
+            }
+
+            closeModal() {
+                const modal = document.getElementById('messageModal');
+                modal.classList.remove('show');
+                document.body.classList.remove('modal-open');
+            }
+
+            saveCredentials() {
+                const form = document.getElementById('imapForm');
+                const creds = {
+                    mailbox: form.mailbox.value,
+                    username: form.username.value,
+                    password: form.password.value,
+                };
+                localStorage.setItem(this.storageKey, JSON.stringify(creds));
+                this.showToast('Credentials saved!');
+            }
+
+            loadCredentials() {
+                const saved = localStorage.getItem(this.storageKey);
+                if (saved) {
+                    try {
+                        const creds = JSON.parse(saved);
+                        const form = document.getElementById('imapForm');
+                        if (creds.mailbox) form.mailbox.value = creds.mailbox;
+                        if (creds.username) form.username.value = creds.username;
+                        if (creds.password) form.password.value = creds.password;
+                        this.showToast('Credentials loaded!');
+                    } catch (e) {
+                        this.showToast('Failed to load credentials', true);
+                    }
+                } else {
+                    this.showToast('No saved credentials found', true);
+                }
+            }
+
+            clearCredentials() {
+                localStorage.removeItem(this.storageKey);
+                this.showToast('Saved credentials cleared');
+            }
+
+            clearFilters() {
+                const form = document.getElementById('imapForm');
+                form.limit.value = '10';
+                form.read_status.value = 'ALL';
+                form.answered_status.value = 'ALL';
+                form.date_from.value = '';
+                form.date_to.value = '';
+                form.search_field.value = 'ALL';
+                form.search_text.value = '';
+                form.exclude_from.value = '';
+                form.exclude_subject.value = '';
+                form.body_length.value = this.defaultBodyLength;
+                this.showToast('Filters cleared');
+            }
+
+            showToast(message, isError = false) {
+                const toast = document.getElementById('toast');
+                toast.textContent = message;
+                toast.style.background = isError ? 'var(--error)' : 'var(--success)';
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 2500);
+            }
+
+            scrollToTop() {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+
+            toggleAdvanced() {
+                const panel = document.getElementById('advancedOptions');
+                panel.classList.toggle('show');
+            }
+
+            togglePassword(target) {
+                const input = document.getElementById('password');
+                const isPassword = input.type === 'password';
+                input.type = isPassword ? 'text' : 'password';
+                if (!target.hasAttribute('data-default-content')) {
+                    target.setAttribute('data-default-content', target.textContent.trim());
+                }
+                target.textContent = isPassword
+                    ? target.dataset.toggleContent
+                    : target.dataset.defaultContent;
+            }
+
+            /**
+             * Format IMAP providers from JSON to HTML table
+             * Called when the IMAP providers panel is toggled
+             *
+             * @param {Element[]} targets - The toggled elements
+             * @param {string} newState - 'active' or 'inactive'
+             * @param {Element} trigger - The button that triggered the toggle
+             */
+            formatImapProviders(targets, newState, trigger) {
+                if (newState !== 'active') return; // Only format when opening
+
+                const pre = document.getElementById('y-known-imap-providers');
+                if (!pre || pre.dataset.yFormatted) return; // Already formatted
+
+                try {
+                    const data = JSON.parse(pre.textContent);
+                    const providers = data.imapProviders || [];
+
+                    const html = `
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr> <th>Provider</th> <th>Mailbox String</th> </tr>
+                                </thead>
+                                <tbody>
+                                    ${providers.map((provider, idx) => `
+                                        <tr style="${idx % 2 === 0 ? 'background: rgba(59, 130, 246, 0.03);' : ''}">
+                                            <td ${provider.notes
+                                                ? `title="${this.escapeHtml(provider.notes)}"`
+                                                : ''}>${this.escapeHtml(provider.name)}</td>
+                                            <td><code>${this.escapeHtml(provider.mailbox)}</code></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+
+                    pre.outerHTML = `<div id="y-known-imap-providers" data-y-formatted="true">${html}</div>`;
+                } catch (e) {
+                    console.error('Failed to parse IMAP providers JSON:', e);
+                }
+            }
+
+            /**
+             * Universal toggle handler with YEH auto-targeting
+             *
+             * @param {Element} target - The resolved trigger element (YEH auto-targeting)
+             * @param {Event} event - The original DOM event
+             * @param {Element} container - The matched container element (#app)
+             */
+            toggleTarget(target, event, container) {
+                const targetSelector = target.dataset.target;
+                if (!targetSelector) return;
+
+                const config = {
+                    targetAll: target.hasAttribute('data-target-all'),
+                    toggleClass: target.dataset.toggleClass,
+                    toggleContent: target.dataset.toggleContent,
+                    toggleAttribute: target.dataset.toggleAttribute,
+                    toggleAttributeValue: target.dataset.toggleAttributeValue,
+                    toggleClassSelf: target.dataset.toggleClassSelf,
+                    toggleContentSelf: target.dataset.toggleContentSelf,
+                    toggleOnce: target.hasAttribute('data-toggle-once'),
+                    toggleCallback: target.dataset.toggleCallback,
+                    toggleCallbackOnce: target.hasAttribute('data-toggle-callback-once'),
+                };
+
+                const targets = config.targetAll
+                    ? Array.from(document.querySelectorAll(targetSelector))
+                    : [document.querySelector(targetSelector)].filter(Boolean);
+
+                if (!targets.length) return;
+
+                // 🎯 Initialize or read persistent state
+                let currentState = target.dataset.toggleState; // 'active' | 'inactive' | undefined
+
+                if (!currentState) {
+                    // First click: determine initial state from button's CSS class
+                    if (config.toggleClassSelf) {
+                        currentState = target.classList.contains(config.toggleClassSelf)
+                            ? 'active'
+                            : 'inactive';
+                    } else {
+                        currentState = 'inactive'; // Default starting state
+                    }
+                }
+
+                // Determine action based on CURRENT STATE (not CSS class!)
+                const shouldAdd = currentState === 'inactive';
+                const newState = shouldAdd ? 'active' : 'inactive';
+
+                // Apply operations to target element(s)
+                targets.forEach(targetEl => {
+                    if (config.toggleClass) {
+                        if (config.targetAll) {
+                            // Unified state based on persistent state
+                            if (shouldAdd) {
+                                targetEl.classList.add(config.toggleClass);
+                            } else {
+                                targetEl.classList.remove(config.toggleClass);
+                            }
+                        } else {
+                            // Individual toggle (no state sync needed)
+                            targetEl.classList.toggle(config.toggleClass);
+                        }
+                    }
+
+                    if (config.toggleContent) {
+                        if (!targetEl.dataset.yOriginalContent) {
+                            targetEl.dataset.yOriginalContent = targetEl.textContent;
+                        }
+
+                        if (config.targetAll) {
+                            // Unified content based on state
+                            targetEl.textContent = shouldAdd
+                                ? config.toggleContent
+                                : targetEl.dataset.yOriginalContent;
+                        } else {
+                            // Individual toggle
+                            const current = targetEl.textContent;
+                            targetEl.textContent = current === config.toggleContent
+                                ? targetEl.dataset.yOriginalContent
+                                : config.toggleContent;
+                        }
+                    }
+
+                    if (config.toggleAttribute) {
+                        if (config.targetAll) {
+                            // Unified attribute state
+                            if (shouldAdd) {
+                                const value = config.toggleAttributeValue || '';
+                                targetEl.setAttribute(config.toggleAttribute, value);
+                            } else {
+                                targetEl.removeAttribute(config.toggleAttribute);
+                            }
+                        } else {
+                            // Individual toggle
+                            if (targetEl.hasAttribute(config.toggleAttribute)) {
+                                targetEl.removeAttribute(config.toggleAttribute);
+                            } else {
+                                const value = config.toggleAttributeValue || '';
+                                targetEl.setAttribute(config.toggleAttribute, value);
+                            }
+                        }
+                    }
+                });
+
+                // Update button state (CSS class for styling)
+                if (config.toggleClassSelf) {
+                    if (newState === 'active') {
+                        target.classList.add(config.toggleClassSelf);
+                    } else {
+                        target.classList.remove(config.toggleClassSelf);
+                    }
+                }
+
+                // Update button content
+                if (config.toggleContentSelf) {
+                    if (!target.dataset.yOriginalContentSelf) {
+                        target.dataset.yOriginalContentSelf = target.textContent;
+                    }
+
+                    target.textContent = newState === 'active'
+                        ? config.toggleContentSelf
+                        : target.dataset.yOriginalContentSelf;
+                }
+
+                // 🔥 PERSIST THE NEW STATE (source of truth!)
+                target.dataset.toggleState = newState;
+
+                // 🎯 Execute callback if specified (data-attribute approach)
+                if (config.toggleCallback && typeof this[config.toggleCallback] === 'function') {
+                    const shouldRunCallback = !config.toggleCallbackOnce ||
+                                             !target.dataset.yCallbackExecuted;
+
+                    if (shouldRunCallback) {
+                        // Call the method with context: (targets, newState, triggerElement)
+                        this[config.toggleCallback](targets, newState, target);
+
+                        if (config.toggleCallbackOnce) {
+                            target.dataset.yCallbackExecuted = 'true';
+                        }
+                    }
+                }
+
+                // 📡 Emit custom event for subscribers (pub/sub approach)
+                this.emit('yeh:toggle', {
+                    targets,
+                    newState,
+                    previousState: currentState,
+                    trigger: target,
+                    selector: targetSelector,
+                });
+
+                if (config.toggleOnce) {
+                    target.removeAttribute('data-action');
+                    target.disabled = true;
+                }
+            }
+
+        }
+
+        new ImapHandler();
+    </script>
+</body>
+</html>

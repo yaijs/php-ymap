@@ -1,0 +1,22 @@
+{
+    "name": "yaijs/php-ymap",
+    "description": "Lightweight IMAP reader/flagger for PHP 8.1+",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.1",
+        "ext-imap": "*",
+        "ext-iconv": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^1.10",
+        "phpunit/phpunit": "^10.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Yai\\Ymap\\": "src/"
+        }
+    }
+}
