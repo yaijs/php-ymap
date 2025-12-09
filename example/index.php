@@ -1,3 +1,17 @@
+<?php
+/**
+ * php-ymap Demo - Unified Entry Point
+ * Handles both HTML UI and AJAX API requests
+ */
+
+// If this is a POST request, handle it as an API call
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require __DIR__ . '/get.php';
+    exit;
+}
+
+// Otherwise, serve the HTML UI
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -633,7 +647,7 @@
 
         .address-link {
             margin-left: 8px;
-            max-width: 220px;
+            max-width: 200px;
             display: inline-block;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -1269,7 +1283,7 @@
                 messagesContainer.style.display = 'none';
 
                 try {
-                    const response = await fetch('./get.php', {
+                    const response = await fetch(window.location.pathname, {
                         method: 'POST',
                         body: new FormData(form)
                     });

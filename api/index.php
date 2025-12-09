@@ -1,7 +1,7 @@
 <?php
 /**
  * Vercel API Entry Point
- * Routes requests to the example directory
+ * Routes all requests to the example directory
  *
  * Requires PHP 8.1+ (vercel-php@0.7.4 uses PHP 8.2)
  */
@@ -17,4 +17,4 @@ if (PHP_VERSION_ID < 80100) {
     exit;
 }
 
-require dirname(__DIR__) . '/example/get.php';
+require dirname(__DIR__) . '/example/index.php';

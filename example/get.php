@@ -12,7 +12,7 @@ ini_set('display_errors', '0');
 
 header('Content-Type: application/json');
 
-require_once __DIR__ . '/../vendor/autoload.php';
+require_once dirname(__DIR__) . '/vendor/autoload.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
