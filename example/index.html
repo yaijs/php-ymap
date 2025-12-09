@@ -1269,7 +1269,7 @@
                 messagesContainer.style.display = 'none';
 
                 try {
-                    const response = await fetch('get.php', {
+                    const response = await fetch('./get.php', {
                         method: 'POST',
                         body: new FormData(form)
                     });
