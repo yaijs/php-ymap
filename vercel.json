@@ -1,17 +1,13 @@
 {
   "functions": {
-    "example/get.php": {
+    "api/**/*.php": {
       "runtime": "vercel-php@0.7.1"
     }
   },
-  "routes": [
+  "rewrites": [
     {
-      "src": "/example",
-      "dest": "/example/index.html"
-    },
-    {
-      "src": "/example/(.*)",
-      "dest": "/example/$1"
+      "source": "/example/get.php",
+      "destination": "/api/get.php"
     }
   ]
 }
