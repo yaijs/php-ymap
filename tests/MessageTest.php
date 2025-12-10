@@ -116,7 +116,7 @@ final class MessageTest extends TestCase
 
         $this->assertCount(1, $message->getAttachments());
         $this->assertSame($attachment, $message->getAttachments()[0]);
-        $this->assertSame(14, $attachment->getSize()); // strlen('binary-content')
+        $this->assertSame(strlen('binary-content'), $attachment->getSize());
     }
 
     public function testFlagManagement(): void
