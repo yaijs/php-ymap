@@ -52,6 +52,7 @@ use function quoted_printable_decode;
 use function sort;
 use function sprintf;
 use function strcasecmp;
+use function strlen;
 use function strtolower;
 use function strtoupper;
 use function trim;
@@ -214,6 +215,13 @@ final class ImapClient
         }
 
         $this->parseStructure($message, $structure, $uid);
+
+        // Calculate message size from content only (text + HTML + attachments)
+        $size = strlen($message->getTextBody() ?? '') + strlen($message->getHtmlBody() ?? '');
+        foreach ($message->getAttachments() as $attachment) {
+            $size += $attachment->getSize();
+        }
+        $message->setSize($size);
 
         return $message;
     }
@@ -446,6 +454,20 @@ final class ImapClient
 
     private function isAttachmentPart(object $part): bool
     {
+        // Text parts (text/plain, text/html) with inline disposition are body content, not attachments
+        if ($this->isTextPart($part, 'PLAIN') || $this->isTextPart($part, 'HTML')) {
+            // Only treat as attachment if explicitly marked as ATTACHMENT (not INLINE)
+            if (isset($part->disposition)) {
+                $disposition = strtoupper((string) $part->disposition);
+                if ('ATTACHMENT' === $disposition) {
+                    return true;
+                }
+            }
+            // Text parts without ATTACHMENT disposition are body content
+            return false;
+        }
+
+        // For non-text parts, INLINE or ATTACHMENT disposition means it's an attachment
         if (isset($part->disposition)) {
             $disposition = strtoupper((string) $part->disposition);
             if (in_array($disposition, ['ATTACHMENT', 'INLINE'], true)) {

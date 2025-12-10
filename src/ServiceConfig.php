@@ -2,10 +2,15 @@
 
 namespace Yai\Ymap;
 
+use function addslashes;
+use function array_diff;
 use function array_key_exists;
 use function array_merge;
+use function array_unshift;
+use function array_values;
 use function date;
 use function implode;
+use function in_array;
 use function is_array;
 use function strtotime;
 
@@ -81,6 +86,7 @@ final class ServiceConfig
         'date',
         'from',
         'textBody',
+        'size',
     ];
 
     /**

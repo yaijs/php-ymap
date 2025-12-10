@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2025-12-10
+
+### Fixed
+- **Critical:** Emails with `Content-Disposition: inline` on text/plain or text/html parts were incorrectly treated as attachments instead of body content
+  - Affected newsletters and marketing emails (e.g., STRATO newsletters) that appeared empty with body parts listed as attachments
+  - Modified `ImapClient::isAttachmentPart()` to check content type before disposition
+  - Text parts with inline disposition are now correctly treated as body content
+
+### Added
+- Message size tracking and display
+  - Individual message sizes shown for each message (content-based: text + HTML + attachments)
+  - Total size counter in messages header with message count
+  - Smart formatting (B/KB/MB units)
+  - Typically 79-86% of RFC822 message size (excludes headers, MIME boundaries, encoding overhead)
+
+### Changed
+- **Demo improvements:**
+  - Modal animations: Smooth slide-up/down transitions on open/close
+  - Modal navigation: Previous/Next buttons for browsing messages without closing modal
+  - Select elements: Fixed read/unread and answered/unanswered selects to use consistent option ordering
+  - Initial state: Messages now arrive collapsed by default with synchronized toggle button
+
+### Files Modified
+- `src/ImapClient.php` - Fixed attachment detection logic, added size calculation
+- `src/Message.php` - Added size property with getter/setter
+- `src/ImapService.php` - Added 'size' field to serialization
+- `src/ServiceConfig.php` - Added 'size' to DEFAULT_FIELDS
+- `example/get.php` - Size formatting and field inclusion
+- `example/index.php` - Modal UX enhancements, size display, collapsed state
+
+[1.0.1]: https://github.com/yaijs/php-ymap/releases/tag/v1.0.1
+
 ## [1.0.0] - 2025-01-XX
 
 ### Added

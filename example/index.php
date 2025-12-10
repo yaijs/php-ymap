@@ -1,18 +1,15 @@
 <?php
+
 /**
- * php-ymap Demo - Unified Entry Point
- * Handles both HTML UI and AJAX API requests
+ * php-ymap Demo - Unified Entry Point ~ php -S localhost:8000
  */
 
-// If this is a POST request, handle it as an API call
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_once dirname(__FILE__) . '/get.php';
     exit;
 }
 
-// Otherwise, serve the HTML UI
-?>
-<!DOCTYPE html>
+?><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -35,9 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
-        html {
-            scrollbar-gutter: stable;
-        }
+        html { scrollbar-gutter: stable; }
 
         body {
             background: radial-gradient( circle at 20% 80%, rgba(59, 130, 246, 0.05) 0%, transparent 50% ), radial-gradient( circle at 80% 20%, rgba(139, 92, 246, 0.05) 0%, transparent 50% ), var(--bg);
@@ -60,39 +55,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         body.modal-open {
             overflow: hidden;
-        }
-
-        header {
-            margin: 0 auto;
-            padding: 0 2rem;
-            max-width: 1200px;
-            line-height: 1;
-        }
-
-        header h1 {
-            font-size: 2.5rem;
-            font-weight: 800;
-            margin-bottom: 0;
-            letter-spacing: 0.02em;
-            background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        main {
-            margin: 0 auto;
-            padding: 0 2rem;
-            max-width: 1200px;
-        }
-
-        .subtitle {
-            color: var(--muted);
-            margin-bottom: 2rem;
-            font-size: 1.05rem;
-            padding-top: .75rem;
-            margin-top: .75rem;
-            border-top: 1px solid #88899955;
         }
 
         .card {
@@ -139,6 +101,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             animation: shimmer 2.5s infinite;
         }
 
+        header {
+            margin: 0 auto;
+            padding: 0 2rem;
+            max-width: 1200px;
+            line-height: 1;
+        }
+
+        header h1 {
+            font-size: 2.25rem;
+            font-weight: 800;
+            margin-bottom: 0;
+            letter-spacing: 0.02em;
+            background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        header .subtitle {
+            color: var(--muted);
+            margin-bottom: 2rem;
+            font-size: 1.05rem;
+            padding-top: .75rem;
+            margin-top: .75rem;
+            border-top: 1px solid #88899955;
+        }
+
+        main {
+            margin: 0 auto;
+            padding: 0 2rem;
+            max-width: 1200px;
+        }
+
+        footer nav {
+            padding: 1rem 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        footer nav a {
+            display: block;
+            padding: 0 15px;
+            color: var(--text);
+        }
+
+        footer nav a:not(:last-of-type) {
+            box-shadow: 1px 0 0px 0px #7d88f826;
+        }
+
         .table-container {
             overflow-x: auto;
         }
@@ -146,7 +157,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 1rem;
+            margin-bottom: 1rem;
         }
 
         table thead tr {
@@ -244,6 +255,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         .form-row .form-group { margin-bottom: 0; }
 
+        .form-groups { display: flex; gap: 1rem; }
+        .form-groups .form-group { flex: 1 auto; }
+
         .form-search-in-row,
         .btn-group.submit-buttons {
             margin-top: 1rem;
@@ -252,7 +266,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .btn-group.submit-buttons {
             margin-top: 1.5rem;
             padding-top: 1.5rem;
+            gap: .75rem;
             border-top: 1px solid var(--border);
+            transition: all .3s ease-in-out;
+            filter: grayscale(0%);
+            opacity: 1;
+        }
+        body.imap-loading .submit-buttons button:disabled { opacity: 1; }
+
+        body.imap-loading .btn-group.submit-buttons {
+            transition: all .3s ease-in;
+            filter: grayscale(100%);
+            opacity: .6;
+        }
+
+        hr {
+            margin: 1rem 0;
+            line-height: 1;
+            border-color: #2b384b;
+        }
+
+        .card.connection {
+            transition: all .3s ease-in;
+        }
+
+        .card.connection > h2 {
+            margin-bottom: 1rem;
+            line-height: 1;
+            font-size: 1.25rem;
         }
 
         .section-title {
@@ -279,11 +320,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
-            transition: background 0.3s, box-shadow 0.2s;
+            transition: background 0.3s ease-, box-shadow 0.2s ease-in;
         }
 
         button:hover { box-shadow: 0 5px 20px rgba(59, 130, 246, 0.2); }
-        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        button:disabled { opacity: .6; cursor: not-allowed; }
 
         button[type="submit"] {
             background: linear-gradient(135deg, var(--accent), #8b5cf6);
@@ -356,23 +397,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             color: #fee2e2;
         }
 
-        .btn-group { display: flex; gap: 0.5rem; margin-top: 1rem; }
-
-        footer nav {
-            padding: 1rem 0;
-            display: flex;
-            justify-content: center;
-        }
-
-        footer nav a {
-            display: block;
-            padding: 0 15px;
-            color: var(--text);
-        }
-
-        footer nav a:not(:last-of-type) {
-            box-shadow: 1px 0 0px 0px #7d88f826;
-        }
+        .btn-group { display: flex; gap: 0.5rem; margin-top: .75rem; }
 
         .alert {
             padding: 1rem;
@@ -428,14 +453,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             z-index: 2;
         }
 
-        .message:hover {
-            /* border-color: rgba(59, 130, 246, 0.5); */
-            box-shadow: 0 20px 45px rgba(15, 23, 42, 0.35);
-        }
-
         .message.message--read:hover {
             border-color: rgba(34, 197, 94, .3);
-            box-shadow: 0 20px 45px rgba(15, 23, 42, 0.35);
         }
 
         .message:hover::before {
@@ -443,16 +462,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         .message--unread {
-            border-left-color: var(--accent);
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), transparent);
+            border-color: var(--accent);
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.03), rgba(39, 36, 36, 0.3));
         }
 
         .message--read {
-            border-left-color: rgba(59, 130, 246, 0.15);
-        }
-
-        .message--answered {
-            box-shadow: 0 0 18px 2px rgba(59, 225, 246, .3);
+            border-color: rgba(59, 130, 246, 0.15);
         }
 
         .message-header {
@@ -482,11 +497,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         .message-subject.collapsed::before { transform: rotate(-90deg); }
 
-        .message-date {
+        .message-date-size {
+            display: flex;
             font-size: 0.8rem;
             color: var(--muted);
-            white-space: nowrap;
         }
+        .message-date-size span:not(:last-of-type) {
+            margin-right: .75rem;
+            padding-right: .75rem;
+            display: block;
+            white-space: nowrap;
+            border-right: 1px solid #9b9191;
+        }
+        .message-size { font-weight: 600; }
 
         .message-status-group {
             display: flex;
@@ -574,6 +597,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         .message-meta-wrapper {
             display: flex;
+            flex-wrap: wrap;
             gap: 1rem;
             line-height: 1;
         }
@@ -718,8 +742,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .loading {
             display: none;
             position: fixed;
-            bottom: 20px;
+            bottom: 30px;
             left: 50%;
+            white-space: nowrap;
             transform: translateX(-50%);
             background: var(--surface);
             border: 2px solid var(--loading-border);
@@ -760,9 +785,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         .toast.show { opacity: 1; transform: translateY(0); }
 
-        body.yvp-is-scrolled .toast { right: 5.5rem; }
+        body.page-is-scrolled .toast { right: 5.5rem; }
 
-        #messagesContainer, #statusContainer { display: none; }
+        #messagesContainer, #statusContainer { display: none; will-change: auto; }
 
         .modal {
             position: fixed;
@@ -780,23 +805,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .modal-overlay {
             position: absolute;
             inset: 0;
-            background: rgba(4, 20, 57, .5);
+            background: rgba(11, 13, 18, .8);
             backdrop-filter: blur(8px);
+            opacity: 0;
+            transition: opacity 0.3s ease-out;
+        }
+
+        .modal.show .modal-overlay {
+            opacity: 1;
+        }
+
+        .modal.closing .modal-overlay {
+            opacity: 0;
         }
 
         .modal-content {
-            padding: 1.75rem;
             width: 100%;
             max-width: calc(1200px - 4rem);
             max-height: 90vh;
             position: relative;
             z-index: 2;
-            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
             background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95) );
             border: 1px solid rgba(59, 130, 246, 0.35);
             border-radius: 20px;
             box-shadow: 0 25px 50px rgba(0, 0, 0, 0.55);
             backdrop-filter: blur(18px);
+            transform: translateY(100%);
+            opacity: 0;
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease-out;
+        }
+
+        .modal.show .modal-content {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .modal.closing .modal-content {
+            transform: translateY(100%);
+            opacity: 0;
+        }
+
+        .modal-content-inner {
+            padding: 1.75rem;
+            overflow-y: auto;
+            flex: 1;
+            display: grid;
+            height: 100%;
         }
 
         .modal-close {
@@ -822,8 +878,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-size: 1rem;
             white-space: pre-wrap;
             line-height: 1.5;
-            max-height: 55vh;
             overflow-y: auto;
+            overflow-wrap: break-word;
         }
 
         .modal-header {
@@ -854,6 +910,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         .modal-meta strong { min-width: 90px; color: var(--text); }
 
+        .modal-nav {
+            display: flex;
+            width: 100%;
+            border-top: 1px solid rgba(59, 130, 246, 0.35);
+        }
+
+        .modal-nav-btn {
+            flex: 1;
+            height: 42px;
+            padding: 0 1.25rem;
+            background: transparent;
+            border: none;
+            border-radius: 0;
+            border-right: 1px solid rgba(59, 130, 246, 0.35);
+            color: var(--accent);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .modal-nav-btn:last-child {
+            border-right: none;
+        }
+
+        .modal-nav-btn:hover:not(:disabled) {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--text);
+        }
+
+        .modal-nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
         .scroll-to-top-container {
             padding: 0;
             position: fixed;
@@ -879,7 +973,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             pointer-events: none;
         }
 
-        body.yvp-is-scrolled .scroll-to-top {
+        body.page-is-scrolled .scroll-to-top {
             opacity: 1;
             transform: translateY(0);
             pointer-events: auto;
@@ -919,34 +1013,136 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </header>
     <main class="container" id="app">
         <div class="card connection">
-            <h2 style="margin-bottom: 1rem; font-size: 1.25rem;">Connection Settings</h2>
+            <h2>Connection Settings</h2>
             <form id="imapForm" data-submit="search">
-                <div class="form-group">
-                    <label for="mailbox">Mailbox Path</label>
-                    <input type="text" id="mailbox" name="mailbox"
-                           value="{imap.gmail.com:993/imap/ssl}INBOX"
-                           placeholder="{imap.gmail.com:993/imap/ssl}INBOX"
-                           required>
+
+                <div class="form-groups">
+                    <div class="form-group">
+                        <label for="mailbox">Mailbox Path</label>
+
+                        <div class="form-groups">
+                            <input type="text" id="mailbox" name="mailbox"
+                                value="{imap.gmail.com:993/imap/ssl}INBOX"
+                                placeholder="{imap.gmail.com:993/imap/ssl}INBOX"
+                                required>
+                            <button type="button"
+                                class="action-btn"
+                                data-action="toggleTarget"
+                                data-target="[data-targeted='maps']"
+                                data-toggle-class="toggle-not-active"
+                                data-toggle-class-self="btn-active"
+                                data-toggle-content-self="Close Provider"
+                                data-toggle-callback="formatImapProviders"
+                                data-toggle-callback-once>
+                                IMAP Provider
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="username">Username / Email</label>
-                    <input type="text" id="username" name="username"
-                        placeholder="your-email@gmail.com"
-                        autocomplete="username"
-                        required>
+
+                <!-- Imap provider -->
+                <div data-targeted="maps" class="y-toggle-target toggle-not-active">
+                    <pre id="y-known-imap-providers">{
+                    "imapProviders": [
+                        {
+                            "name": "Gmail / Google Workspace",
+                            "host": "imap.gmail.com:993",
+                            "mailbox": "{imap.gmail.com:993/imap/ssl/novalidate-cert}INBOX",
+                            "boxes": ["INBOX", "[Gmail]/Sent Mail", "[Gmail]/Drafts", "[Gmail]/Spam", "[Gmail]/Trash"],
+                            "notes": "Requires App Password (2FA enabled) or OAuth2 for Google Workspace"
+                        },{
+                            "name": "Outlook.com / Hotmail / Office 365",
+                            "host": "outlook.office365.com:993",
+                            "mailbox": "{outlook.office365.com:993/imap/ssl/novalidate-cert}INBOX",
+                            "boxes": ["INBOX", "Sent", "Drafts", "Junk", "Trash", "Archive"],
+                            "notes": "Works with normal password or App Password"
+                        },{
+                            "name": "Microsoft Exchange (on-prem or hybrid)",
+                            "host": "mail.yourcompany.com:993",
+                            "mailbox": "{mail.yourcompany.com:993/imap/ssl/novalidate-cert}INBOX",
+                            "boxes": ["INBOX", "Sent Items", "Drafts", "Junk Email", "Deleted Items"],
+                            "notes": "Replace with your actual domain. Often needs /novalidate-cert"
+                        },{
+                            "name": "iCloud",
+                            "host": "imap.mail.me.com:993",
+                            "mailbox": "{imap.mail.me.com:993/imap/ssl/novalidate-cert}INBOX",
+                            "boxes": ["INBOX", "Sent Messages", "Drafts", "Junk", "Trash", "Archive"],
+                            "notes": "Use Apple ID + App-Specific Password"
+                        },{
+                            "name": "Yahoo Mail",
+                            "host": "imap.mail.yahoo.com:993",
+                            "mailbox": "{imap.mail.yahoo.com:993/imap/ssl/novalidate-cert}INBOX",
+                            "boxes": ["INBOX", "Sent", "Draft", "Bulk", "Trash", "Archive"],
+                            "notes": "Requires App Password (under Account Security)"
+                        },{
+                            "name": "AOL Mail",
+                            "host": "imap.aol.com:993",
+                            "mailbox": "{imap.aol.com:993/imap/ssl/novalidate-cert}INBOX",
+                            "boxes": ["INBOX", "Sent", "Saved", "Spam", "Trash"],
+                            "notes": "Use App Password"
+                        },{
+                            "name": "1&1 IONOS (DE/UK/ES)",
+                            "host": "imap.ionos.de:993",
+                            "mailbox": "{imap.ionos.de:993/imap/ssl/novalidate-cert}INBOX",
+                            "boxes": ["INBOX", "Sent", "Drafts", "Spam", "Trash"],
+                            "notes": "Also works: imap.ionos.co.uk, imap.ionos.es, imap.ionos.com"
+                        },{
+                            "name": "Strato",
+                            "host": "imap.strato.de:993",
+                            "mailbox": "{imap.strato.de:993/imap/ssl/novalidate-cert}INBOX",
+                            "boxes": ["INBOX", "Sent", "Drafts", "Spam", "Trash"]
+                        },{
+                            "name": "GMX",
+                            "host": "imap.gmx.net:993",
+                            "mailbox": "{imap.gmx.net:993/imap/ssl/novalidate-cert}INBOX",
+                            "boxes": ["INBOX", "Sent", "Drafts", "Spam", "Trash"],
+                            "notes": "Also: imap.gmx.com"
+                        },{
+                            "name": "WEB.DE",
+                            "host": "imap.web.de:993",
+                            "mailbox": "{imap.web.de:993/imap/ssl/novalidate-cert}INBOX",
+                            "boxes": ["INBOX", "Gesendet", "Entwürfe", "Spam", "Papierkorb"]
+                        },{
+                            "name": "hosteurope / PlusServer",
+                            "host": "imap.hosteurope.de:993",
+                            "mailbox": "{imap.hosteurope.de:993/imap/ssl/novalidate-cert}INBOX",
+                            "boxes": ["INBOX", "Sent", "Drafts", "Trash"]
+                        },{
+                            "name": "All-inkl",
+                            "host": "imap.all-inkl.com:993",
+                            "mailbox": "{imap.all-inkl.com:993/imap/ssl/novalidate-cert}INBOX",
+                            "boxes": ["INBOX", "Sent", "Drafts", "Trash"]
+                        },{
+                            "name": "Zoho Mail",
+                            "host": "imap.zoho.eu:993",
+                            "mailbox": "{imap.zoho.eu:993/imap/ssl/novalidate-cert}INBOX",
+                            "boxes": ["INBOX", "Sent", "Drafts", "Spam", "Trash"],
+                            "notes": "Use imap.zoho.com (US) or imap.zoho.eu / .au / .in depending on region"
+                        }
+                    ]}</pre>
                 </div>
-                <div class="form-group">
-                    <label for="password">Password / App Password</label>
-                    <div class="password-wrapper">
-                        <input type="password" id="password" name="password"
-                            placeholder="Generated app password"
-                            autocomplete="current-password"
+
+                <div class="form-groups">
+                    <div class="form-group">
+                        <label for="username">Username / Email</label>
+                        <input type="text" id="username" name="username"
+                            placeholder="your-email@gmail.com"
+                            autocomplete="username"
                             required>
-                        <button type="button"
-                            class="password-toggle"
-                            data-action="togglePassword"
-                            title="Toggle password visibility"
-                            data-toggle-content="📛">👀</button>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password / App Password</label>
+                        <div class="password-wrapper">
+                            <input type="password" id="password" name="password"
+                                placeholder="Generated app password"
+                                autocomplete="current-password"
+                                required>
+                            <button type="button"
+                                class="password-toggle"
+                                data-action="togglePassword"
+                                title="Toggle password visibility"
+                                data-toggle-content="📛">👀</button>
+                        </div>
                     </div>
                 </div>
 
@@ -1029,7 +1225,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <div class="hint">Controls how much of the message body is shown in cards. Full text is always available in the modal.</div>
                         </div>
                     </div>
-
                     <div class="section-title">🚫 Exclusion Filters</div>
                     <div class="form-row">
                         <div class="form-group">
@@ -1052,17 +1247,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div id="messagesContainer">
             <div class="messages-header">
                 <h2 style="font-size: 1.25rem;">Messages</h2>
-                <div>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <span id="totalSizeDisplay" style="font-size: 0.9rem; color: var(--muted);"></span>
                     <button type="button"
                         class="action-btn"
                         data-action="toggleTarget"
                         data-target=".message-body,.message-subject"
                         data-target-all
                         data-toggle-class="collapsed"
-                        data-toggle-class-self="expanded"
-                        data-toggle-content-self="Expand All"
-                        >
-                        Collapse All
+                        data-toggle-state="collapsed"
+                        data-toggle-content-self="Collapse All">
+                        Expand All
                     </button>
                 </div>
             </div>
@@ -1070,118 +1265,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
         <div class="modal" id="messageModal">
-            <div class="modal-overlay" data-action="closeModal"></div>
+            <div class="modal-overlay"></div>
             <div class="modal-content">
-                <button type="button" class="modal-close" data-action="closeModal" aria-label="Close">✕</button>
-                <div class="modal-header">
-                    <h3 id="modalSubject"></h3>
+                <!-- Default modal content -->
+                <div class="modal-content-inner">
+                    <button type="button" class="modal-close" data-action="closeModal" aria-label="Close">✕</button>
+                    <div class="modal-header"><h3 id="modalSubject"></h3></div>
+                    <div class="modal-meta" id="modalMeta"></div>
+                    <div class="modal-body" id="modalBody"></div>
                 </div>
-                <div class="modal-meta" id="modalMeta"></div>
-                <div class="modal-body" id="modalBody"></div>
+                <!-- Default modal nav -->
+                <div class="modal-nav">
+                    <button type="button" class="modal-nav-btn" id="modalPrevBtn" data-action="openPreviousMessage">
+                        <span>←</span> Previous
+                    </button>
+                    <button type="button" class="modal-nav-btn" id="modalNextBtn" data-action="openNextMessage">
+                        Next <span>→</span>
+                    </button>
+                </div>
             </div>
         </div>
 
         <div class="loading" id="loading">
             <div class="spinner"></div>
             <span>Connecting and fetching messages...</span>
-        </div>
-
-        <!-- Imap provider -->
-        <div class="card imap-card">
-            <div class="imap-card-header">
-                <h3>IMAP Provider</h3>
-                <button
-                    class="action-btn"
-                    data-action="toggleTarget"
-                    data-target="[data-targeted='maps']"
-                    data-toggle-class="toggle-not-active"
-                    data-toggle-class-self="btn-active"
-                    data-toggle-content-self="Hide"
-                    data-toggle-callback="formatImapProviders"
-                    data-toggle-callback-once>
-                    Show
-                </button>
-            </div>
-            <div data-targeted="maps" class="y-toggle-target toggle-not-active">
-                <pre id="y-known-imap-providers">{
-                "imapProviders": [
-                    {
-                        "name": "Gmail / Google Workspace",
-                        "host": "imap.gmail.com:993",
-                        "mailbox": "{imap.gmail.com:993/imap/ssl/novalidate-cert}INBOX",
-                        "boxes": ["INBOX", "[Gmail]/Sent Mail", "[Gmail]/Drafts", "[Gmail]/Spam", "[Gmail]/Trash"],
-                        "notes": "Requires App Password (2FA enabled) or OAuth2 for Google Workspace"
-                    },{
-                        "name": "Outlook.com / Hotmail / Office 365",
-                        "host": "outlook.office365.com:993",
-                        "mailbox": "{outlook.office365.com:993/imap/ssl/novalidate-cert}INBOX",
-                        "boxes": ["INBOX", "Sent", "Drafts", "Junk", "Trash", "Archive"],
-                        "notes": "Works with normal password or App Password"
-                    },{
-                        "name": "Microsoft Exchange (on-prem or hybrid)",
-                        "host": "mail.yourcompany.com:993",
-                        "mailbox": "{mail.yourcompany.com:993/imap/ssl/novalidate-cert}INBOX",
-                        "boxes": ["INBOX", "Sent Items", "Drafts", "Junk Email", "Deleted Items"],
-                        "notes": "Replace with your actual domain. Often needs /novalidate-cert"
-                    },{
-                        "name": "iCloud",
-                        "host": "imap.mail.me.com:993",
-                        "mailbox": "{imap.mail.me.com:993/imap/ssl/novalidate-cert}INBOX",
-                        "boxes": ["INBOX", "Sent Messages", "Drafts", "Junk", "Trash", "Archive"],
-                        "notes": "Use Apple ID + App-Specific Password"
-                    },{
-                        "name": "Yahoo Mail",
-                        "host": "imap.mail.yahoo.com:993",
-                        "mailbox": "{imap.mail.yahoo.com:993/imap/ssl/novalidate-cert}INBOX",
-                        "boxes": ["INBOX", "Sent", "Draft", "Bulk", "Trash", "Archive"],
-                        "notes": "Requires App Password (under Account Security)"
-                    },{
-                        "name": "AOL Mail",
-                        "host": "imap.aol.com:993",
-                        "mailbox": "{imap.aol.com:993/imap/ssl/novalidate-cert}INBOX",
-                        "boxes": ["INBOX", "Sent", "Saved", "Spam", "Trash"],
-                        "notes": "Use App Password"
-                    },{
-                        "name": "1&1 IONOS (DE/UK/ES)",
-                        "host": "imap.ionos.de:993",
-                        "mailbox": "{imap.ionos.de:993/imap/ssl/novalidate-cert}INBOX",
-                        "boxes": ["INBOX", "Sent", "Drafts", "Spam", "Trash"],
-                        "notes": "Also works: imap.ionos.co.uk, imap.ionos.es, imap.ionos.com"
-                    },{
-                        "name": "Strato",
-                        "host": "imap.strato.de:993",
-                        "mailbox": "{imap.strato.de:993/imap/ssl/novalidate-cert}INBOX",
-                        "boxes": ["INBOX", "Sent", "Drafts", "Spam", "Trash"]
-                    },{
-                        "name": "GMX",
-                        "host": "imap.gmx.net:993",
-                        "mailbox": "{imap.gmx.net:993/imap/ssl/novalidate-cert}INBOX",
-                        "boxes": ["INBOX", "Sent", "Drafts", "Spam", "Trash"],
-                        "notes": "Also: imap.gmx.com"
-                    },{
-                        "name": "WEB.DE",
-                        "host": "imap.web.de:993",
-                        "mailbox": "{imap.web.de:993/imap/ssl/novalidate-cert}INBOX",
-                        "boxes": ["INBOX", "Gesendet", "Entwürfe", "Spam", "Papierkorb"]
-                    },{
-                        "name": "hosteurope / PlusServer",
-                        "host": "imap.hosteurope.de:993",
-                        "mailbox": "{imap.hosteurope.de:993/imap/ssl/novalidate-cert}INBOX",
-                        "boxes": ["INBOX", "Sent", "Drafts", "Trash"]
-                    },{
-                        "name": "All-inkl",
-                        "host": "imap.all-inkl.com:993",
-                        "mailbox": "{imap.all-inkl.com:993/imap/ssl/novalidate-cert}INBOX",
-                        "boxes": ["INBOX", "Sent", "Drafts", "Trash"]
-                    },{
-                        "name": "Zoho Mail",
-                        "host": "imap.zoho.eu:993",
-                        "mailbox": "{imap.zoho.eu:993/imap/ssl/novalidate-cert}INBOX",
-                        "boxes": ["INBOX", "Sent", "Drafts", "Spam", "Trash"],
-                        "notes": "Use imap.zoho.com (US) or imap.zoho.eu / .au / .in depending on region"
-                    }
-                ]}</pre>
-            </div>
         </div>
 
         <!-- Usage notes -->
@@ -1202,12 +1309,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <p style="color: var(--muted); margin-bottom: 0.75rem;">
                 This demo uses <strong>YEH</strong> (Yai Event Hub) - a lightweight event delegation library for modern web apps.
             </p>
-            <ul style="color: var(--muted); padding-left: 1.25rem; margin-bottom: 0;">
-                <li><a href="https://yaijs.github.io/yai" target="_blank" rel="noopener" style="color: #a78bfa;">GitHub: yaijs/yai</a> — The Yai toolkit</li>
-                <li><a href="https://yaijs.github.io/yai/docs/yeh/" target="_blank" rel="noopener" style="color: #a78bfa;">YEH Documentation</a> — Events made simple</li>
+            <ul style="color: var(--muted); padding-left: 1.25rem; margin-bottom: 0.75rem;">
+                <li><a href="https://yaijs.github.io/yai/docs/yeh/" target="_blank" rel="noopener" style="color: #a78bfa;">YEH Documentation</a> — Event delegation made simple</li>
+                <li><a href="https://yaijs.github.io/yai/tabs/Example.html" target="_blank" rel="noopener" style="color: #a78bfa;">YaiTabs Live Demo</a> — Advanced tab system built on YEH</li>
             </ul>
+            <hr />
+            <pre>super({<br>  '#app':   ['click', 'input', 'submit'],<br>  'window': ['scroll']<br>})</pre>
         </div>
 
+        <!-- Scroll to top -->
         <div class="scroll-to-top-container">
             <button type="button" class="scroll-to-top" data-action="scrollToTop">▲</button>
         </div>
@@ -1215,8 +1325,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <footer>
         <nav>
-            <a href="https://yaijs.github.io/yai" target="_blank" rel="noopener">YAI</a>
             <a href="https://yaijs.github.io/yai/docs/yeh" target="_blank" rel="noopener">YEH</a>
+            <a href="https://github.com/yaijs/php-ymap" target="_blank" rel="noopener">YMAP</a>
+            <a href="https://yaijs.github.io/yai" target="_blank" rel="noopener">YAI</a>
         </nav>
     </footer>
 
@@ -1225,22 +1336,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <script type="module">
         /**
          * YEH-based Interactive Handler for php-ymap Demo
-         * Complete separation: Pure HTML + AJAX to PHP API
+         * 4 event listener on 2 elements are managing everything
          */
-        import { YEH } from 'https://cdn.jsdelivr.net/npm/@yaijs/core@1.1.1/yeh/yeh.js';
-        import { YaiViewport } from 'https://cdn.jsdelivr.net/npm/@yaijs/core@1.1.1/utils/yai-viewport.min.js';
-
-        // Works out of the box, toggles <body> to: `yvp-is-scrolled` on scroll
-        new YaiViewport({ throttle: { scroll: 250 }, threshold: { pageScrolled: 150 } });
+        import { YEH } from 'https://cdn.jsdelivr.net/npm/@yaijs/core@1.1.1/yeh/yeh.min.js';
 
         // Imap handler
         class ImapHandler extends YEH {
             constructor() {
-                super({ '#app': ['click', 'input', 'submit'] }, {}, {
+                super({
+                      '#app': ['click', 'input', 'submit'],
+                    'window': [{ type: 'scroll', throttle: 240 }],
+                }, {}, {
                     autoTargetResolution: true,
                 });
                 this.storageKey = 'phpYmapCredentials';
                 this.messageCache = new Map();
+                this.messageList = [];
+                this.currentModalMessageIndex = -1;
                 this.defaultBodyLength = 5000;
                 this.init();
             }
@@ -1249,9 +1361,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 this.loadCredentials();
             }
 
+            handleScroll(event, target, container) {
+                document.body.classList.toggle('page-is-scrolled', window.scrollY > 150);
+            }
+
             handleClick(event, target, container) {
-                // container is the selector set in the super
-                // constructor. In this case, it will be `#app`
                 const action = target.dataset.action;
                 if (action && this[action]) this[action](target, event, container);
             }
@@ -1264,6 +1378,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             handleSubmit(event, target, container) {
                 const submit = target.dataset.submit;
                 if (submit && this[submit]) this[submit](target, event, container);
+            }
+
+            scrollToTop() {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             }
 
             // AJAX Search
@@ -1322,7 +1440,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             renderMessages(messages) {
                 const container = document.getElementById('messagesContainer');
                 const list = document.getElementById('messagesList');
+                const totalSizeDisplay = document.getElementById('totalSizeDisplay');
                 this.messageCache = new Map();
+                this.messageList = [];
 
                 if (messages.length === 0) {
                     container.style.display = 'block';
@@ -1331,12 +1451,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <p>No messages found matching your criteria.</p>
                         </div>
                     `;
+                    totalSizeDisplay.textContent = '';
                     return;
                 }
 
+                // Calculate total size
+                let totalSize = 0;
                 messages.forEach(msg => {
                     this.messageCache.set(String(msg.uid), msg);
+                    this.messageList.push(String(msg.uid));
+                    totalSize += msg.size || 0;
                 });
+
+                // Format and display total size
+                const formattedTotal = totalSize >= 1048576
+                    ? (totalSize / 1048576).toFixed(1) + ' MB'
+                    : totalSize >= 1024
+                    ? (totalSize / 1024).toFixed(1) + ' KB'
+                    : totalSize + ' B';
+                totalSizeDisplay.textContent = `Total: ${formattedTotal} (${messages.length} message${messages.length !== 1 ? 's' : ''})`;
 
                 container.style.display = 'block';
                 list.innerHTML = messages.map(msg => this.renderMessage(msg)).join('');
@@ -1364,28 +1497,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     ${msg.subject ? this.escapeHtml(msg.subject) : '<em style="color:var(--muted)">(No subject)</em>'}
                                 </div>
                             </div>
-                            <div class="message-date">${msg.date || 'Unknown'}</div>
+                            <div class="message-date-size">
+                                <span class="message-date">${msg.date || 'Unknown'}</span>
+                                <span class="message-size">${msg.sizeFormatted || '-'}</span>
+                            </div>
                         </div>
                         <div class="message-meta-wrapper">
                             <div class="message-meta">
-                                <strong>From:</strong>
-                                ${formatAddrs(msg.from)}
+                                <strong>From:</strong> ${formatAddrs(msg.from)}
                             </div>
                             ${msg.cc.length ? `
                                 <div class="message-meta">
-                                    <strong>CC:</strong>
-                                    ${formatAddrs(msg.cc)}
+                                    <strong>CC:</strong> ${formatAddrs(msg.cc)}
                                 </div>
                             ` : ''}
                             ${msg.replyTo.length ? `
                                 <div class="message-meta">
-                                    <strong>Reply-To:</strong>
-                                    ${formatAddrs(msg.replyTo)}
+                                    <strong>Reply-To:</strong> ${formatAddrs(msg.replyTo)}
                                 </div>
                             ` : ''}
                             <div class="message-meta">
-                                <strong>To:</strong>
-                                ${formatAddrs(msg.to)}
+                                <strong>To:</strong> ${formatAddrs(msg.to)}
                             </div>
                         </div>
                         ${msg.attachments.length ? `
@@ -1396,7 +1528,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
                         ` : ''}
                         ${preview ? `
-                            <div class="message-body expanded">${this.escapeHtml(preview)}${msg.bodyTruncated ? '...' : ''}</div>
+                            <div class="message-body collapsed">${this.escapeHtml(preview)}${msg.bodyTruncated ? '...' : ''}</div>
                         ` : ''}
                         <div class="message-actions">
                             <div>
@@ -1406,27 +1538,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
                             ${this.renderStatusBadges(msg)}
                             <div class="message-flags">
-                                <select name="toggleReadState-for-${msg.uid}" data-input="toggleReadState" data-uid="${msg.uid}">
-                                    ${msg.seen
-                                        ? `
-                                            <option value="read" selected>Read</option>
-                                            <option value="unread">Mark Unread</option>
-                                        `
-                                        : `
-                                            <option value="unread" selected>Unread</option>
-                                            <option value="read">Mark Read</option>
-                                        `}
+                                <select id="toggleReadState-for-${msg.uid}" data-input="toggleReadState" data-uid="${msg.uid}">
+                                    <option value="read" ${msg.seen ? 'selected' : ''}>Read</option>
+                                    <option value="unread" ${!msg.seen ? 'selected' : ''}>Unread</option>
                                 </select>
-                                <select name="toggleAnswerState-for-${msg.uid}" data-input="toggleAnswerState" data-uid="${msg.uid}">
-                                    ${msg.answered
-                                        ? `
-                                            <option value="answered" selected>Answered</option>
-                                            <option value="unanswered">Mark Unanswered</option>
-                                        `
-                                        : `
-                                            <option value="unanswered" selected>Unanswered</option>
-                                            <option value="answered">Mark Answered</option>
-                                        `}
+                                <select id="toggleAnswerState-for-${msg.uid}" data-input="toggleAnswerState" data-uid="${msg.uid}">
+                                    <option value="answered" ${msg.answered ? 'selected' : ''}>Answered</option>
+                                    <option value="unanswered" ${!msg.answered ? 'selected' : ''}>Unanswered</option>
                                 </select>
                             </div>
                         </div>
@@ -1439,13 +1557,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 const div = document.createElement('div');
                 div.textContent = str;
                 return div.innerHTML;
-            }
-
-            stripHtml(str) {
-                if (!str) return '';
-                const div = document.createElement('div');
-                div.innerHTML = str;
-                return div.textContent || '';
             }
 
             joinAddresses(list = []) {
@@ -1492,6 +1603,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             toggleBody(target) {
                 const message = target.closest('.message');
                 const body = message?.querySelector('.message-body');
+
                 if (body) {
                     body.classList.toggle('collapsed');
                     target.classList.toggle('collapsed');
@@ -1500,7 +1612,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             openModal(target) {
                 const uid = target.dataset.uid;
+
                 if (!uid || !this.messageCache.has(uid)) {
+                    this.showToast('Message not available', true);
+                    return;
+                }
+
+                this.showMessageInModal(uid);
+            }
+
+            showMessageInModal(uid) {
+                if (!this.messageCache.has(uid)) {
                     this.showToast('Message not available', true);
                     return;
                 }
@@ -1510,6 +1632,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 const metaEl = document.getElementById('modalMeta');
                 const bodyEl = document.getElementById('modalBody');
                 const msg = this.messageCache.get(uid);
+
+                // Update current message index
+                this.currentModalMessageIndex = this.messageList.indexOf(uid);
 
                 subjectEl.textContent = msg.subject || '(No subject)';
 
@@ -1522,13 +1647,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div><strong>UID:</strong> ${this.escapeHtml(String(msg.uid))}</div>
                 `;
 
-                const bodyText = msg.bodyFull
-                    || (msg.htmlBody ? this.stripHtml(msg.htmlBody) : '');
+                const bodyText = msg.bodyFull || (msg.htmlBody ? this.escapeHtml(msg.htmlBody) : '');
 
                 bodyEl.textContent = bodyText || '(No body content available)';
 
-                modal.classList.add('show');
+                // Update navigation button states
+                this.updateModalNavButtons();
+
+                // First set display to flex (without animation class)
+                modal.style.display = 'flex';
                 document.body.classList.add('modal-open');
+
+                // Force a reflow to ensure display change is applied
+                modal.offsetHeight;
+
+                // Then add the show class to trigger animation
+                requestAnimationFrame(() => {
+                    modal.classList.add('show');
+                });
+            }
+
+            updateModalNavButtons() {
+                const prevBtn = document.getElementById('modalPrevBtn');
+                const nextBtn = document.getElementById('modalNextBtn');
+
+                if (prevBtn && nextBtn) {
+                    prevBtn.disabled = this.currentModalMessageIndex <= 0;
+                    nextBtn.disabled = this.currentModalMessageIndex >= this.messageList.length - 1;
+                }
+            }
+
+            openPreviousMessage() {
+                if (this.currentModalMessageIndex > 0) {
+                    const prevUid = this.messageList[this.currentModalMessageIndex - 1];
+                    this.showMessageInModal(prevUid);
+                }
+            }
+
+            openNextMessage() {
+                if (this.currentModalMessageIndex < this.messageList.length - 1) {
+                    const nextUid = this.messageList[this.currentModalMessageIndex + 1];
+                    this.showMessageInModal(nextUid);
+                }
             }
 
             async toggleReadState(target) {
@@ -1619,8 +1779,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             closeModal() {
                 const modal = document.getElementById('messageModal');
-                modal.classList.remove('show');
-                document.body.classList.remove('modal-open');
+                modal.classList.add('closing');
+
+                setTimeout(() => {
+                    modal.style.display = '';
+                    modal.classList.remove('show', 'closing');
+                    document.body.classList.remove('modal-open');
+                }, 400);
             }
 
             saveCredentials() {
@@ -1680,15 +1845,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 setTimeout(() => toast.classList.remove('show'), 2500);
             }
 
-            scrollToTop() {
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-
-            toggleAdvanced() {
-                const panel = document.getElementById('advancedOptions');
-                panel.classList.toggle('show');
-            }
-
             togglePassword(target) {
                 const input = document.getElementById('password');
                 const isPassword = input.type === 'password';
@@ -1727,7 +1883,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 </thead>
                                 <tbody>
                                     ${providers.map((provider, idx) => `
-                                        <tr style="${idx % 2 === 0 ? 'background: rgba(59, 130, 246, 0.03);' : ''}">
+                                        <tr style="${idx % 2 === 0 ? 'background: rgba(31, 70, 133, 0.19);' : ''}">
                                             <td ${provider.notes
                                                 ? `title="${this.escapeHtml(provider.notes)}"`
                                                 : ''}>${this.escapeHtml(provider.name)}</td>
@@ -1775,7 +1931,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if (!targets.length) return;
 
-                // 🎯 Initialize or read persistent state
+                // Initialize or read persistent state
                 let currentState = target.dataset.toggleState; // 'active' | 'inactive' | undefined
 
                 if (!currentState) {
@@ -1803,8 +1959,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             } else {
                                 targetEl.classList.remove(config.toggleClass);
                             }
-                        } else {
-                            // Individual toggle (no state sync needed)
+                        } else { // Individual toggle (no state sync needed)
                             targetEl.classList.toggle(config.toggleClass);
                         }
                     }
@@ -1869,13 +2024,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         : target.dataset.yOriginalContentSelf;
                 }
 
-                // 🔥 PERSIST THE NEW STATE (source of truth!)
+                // PERSIST THE NEW STATE (source of truth!)
                 target.dataset.toggleState = newState;
 
-                // 🎯 Execute callback if specified (data-attribute approach)
+                // Execute callback if specified (data-attribute approach)
                 if (config.toggleCallback && typeof this[config.toggleCallback] === 'function') {
-                    const shouldRunCallback = !config.toggleCallbackOnce ||
-                                             !target.dataset.yCallbackExecuted;
+                    const shouldRunCallback = !config.toggleCallbackOnce || !target.dataset.yCallbackExecuted;
 
                     if (shouldRunCallback) {
                         // Call the method with context: (targets, newState, triggerElement)
@@ -1887,7 +2041,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
 
-                // 📡 Emit custom event for subscribers (pub/sub approach)
+                // Emit custom event for subscribers (pub/sub approach)
                 this.emit('yeh:toggle', {
                     targets,
                     newState,
@@ -1904,7 +2058,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         }
 
+        // Init
         new ImapHandler();
+
+        // Demo
+        document.querySelector('h1 a').href = location.pathname;
     </script>
+
 </body>
 </html>

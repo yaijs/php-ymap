@@ -4,10 +4,9 @@ namespace Yai\Ymap;
 
 use Yai\Ymap\Exceptions\ConnectionException;
 use Yai\Ymap\Exceptions\MessageFetchException;
-
 use function array_reverse;
 use function array_slice;
-use function in_array;
+use function count;
 use function mb_stripos;
 
 /**
@@ -289,7 +288,6 @@ final class ImapService
         // Apply limit
         $uidsToFetch = array_slice($uids, 0, $config->limit);
 
-        $messages = [];
         $activeFields = $config->getActiveFields();
 
         foreach ($uidsToFetch as $uid) {
@@ -521,6 +519,7 @@ final class ImapService
                 'headers' => $message->getHeaders(),
                 'seen' => $message->isSeen(),
                 'answered' => $message->isAnswered(),
+                'size' => $message->getSize(),
                 'preview' => $message->getPreviewBody(),
                 default => null,
             };

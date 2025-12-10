@@ -3,6 +3,12 @@
 namespace Yai\Ymap;
 
 use DateTimeImmutable;
+use const ENT_HTML5;
+use const ENT_QUOTES;
+use function html_entity_decode;
+use function preg_replace;
+use function strip_tags;
+use function trim;
 
 final class Message
 {
@@ -53,6 +59,7 @@ final class Message
 
     private bool $seen = false;
     private bool $answered = false;
+    private int $size = 0;
 
     public function __construct(int $uid)
     {
@@ -245,4 +252,15 @@ final class Message
     {
         return $this->answered;
     }
+
+    public function setSize(int $size): void
+    {
+        $this->size = $size;
+    }
+
+    public function getSize(): int
+    {
+        return $this->size;
+    }
+
 }

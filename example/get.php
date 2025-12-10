@@ -8,7 +8,6 @@ use Yai\Ymap\ImapService;
 use Yai\Ymap\Exceptions\ConnectionException;
 
 error_reporting(E_ALL);
-ini_set('display_errors', '0');
 
 header('Content-Type: application/json');
 
@@ -62,6 +61,7 @@ try {
             'attachments',
             'seen',
             'answered',
+            'size',
             'preview',
         ])
         ->limit((int) ($_POST['limit'] ?? 10))
@@ -142,6 +142,17 @@ try {
         $bodyPreview = mb_substr($body, 0, $bodyLength);
         $isTruncated = mb_strlen($body) > $bodyLength;
 
+        $size = (int) ($msg['size'] ?? 0);
+        if ($size >= 1048576) {
+            $sizeFormatted = number_format($size / 1048576, 1) . ' MB';
+        } elseif ($size >= 1024) {
+            $sizeFormatted = number_format($size / 1024, 1) . ' KB';
+        } elseif ($size > 0) {
+            $sizeFormatted = $size . ' B';
+        } else {
+            $sizeFormatted = '-';
+        }
+
         return [
             'uid' => $msg['uid'],
             'subject' => $msg['subject'] ?? '',
@@ -156,6 +167,8 @@ try {
             'htmlBody' => $msg['htmlBody'] ?? null,
             'seen' => (bool) ($msg['seen'] ?? false),
             'answered' => (bool) ($msg['answered'] ?? false),
+            'size' => $size,
+            'sizeFormatted' => $sizeFormatted,
             'attachments' => array_map(static fn($a) => [
                 'filename' => $a['filename'],
                 'size' => $a['size'],
