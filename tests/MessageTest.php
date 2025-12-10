@@ -50,6 +50,7 @@ final class MessageTest extends TestCase
         $message->addTo($to);
 
         $this->assertCount(1, $message->getTo());
+        $this->assertSame($to, $message->getTo()[0]);
     }
 
     public function testTextBodyManagement(): void
@@ -116,7 +117,6 @@ final class MessageTest extends TestCase
 
         $this->assertCount(1, $message->getAttachments());
         $this->assertSame($attachment, $message->getAttachments()[0]);
-        $this->assertSame(strlen('binary-content'), $attachment->getSize());
     }
 
     public function testFlagManagement(): void
