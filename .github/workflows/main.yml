@@ -32,16 +32,10 @@ jobs:
             ${{ runner.os }}-composer-
 
       - name: Install dependencies
-        run: composer install --prefer-dist --no-progress --no-suggest --no-interaction
+        run: composer install --prefer-dist --no-progress --no-interaction
 
       - name: Run PHPStan (level 8)
-        # adjust path or config if needed
-        run: |
-          if [ -f phpstan.neon ]; then
-            ./vendor/bin/phpstan analyse --configuration=phpstan.neon --level=8 src tests || true
-          else
-            ./vendor/bin/phpstan analyse --level=8 src tests || true
-          fi
+        run: ./vendor/bin/phpstan analyse --level=8 src/
 
       - name: Run tests
         # try PHPUnit first; adjust if you use Pest or other runner
