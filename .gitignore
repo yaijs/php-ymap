@@ -4,8 +4,11 @@ php-ymap.code-workspace
 ISSUES.md
 .idea/
 node_modules/
+admyn_commands/
 coverage/
 .phpunit.result.cache
 phpstan.cache
 *.log
 composer.lock
+AI-REVIEWS.md
+TASK_LIST.md

@@ -128,12 +128,12 @@ final class ServiceConfig
             $instance->since = $filters['since'] ?? null;
             $instance->before = $filters['before'] ?? null;
 
-        if (array_key_exists('unread', $filters)) {
-            $instance->unread = $filters['unread'];
-        }
-        if (array_key_exists('answered', $filters)) {
-            $instance->answered = $filters['answered'];
-        }
+            if (array_key_exists('unread', $filters)) {
+                $instance->unread = $filters['unread'];
+            }
+            if (array_key_exists('answered', $filters)) {
+                $instance->answered = $filters['answered'];
+            }
 
             $instance->from = $filters['from'] ?? null;
             $instance->to = $filters['to'] ?? null;

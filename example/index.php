@@ -1310,8 +1310,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 This demo uses <strong>YEH</strong> (Yai Event Hub) - a lightweight event delegation library for modern web apps.
             </p>
             <ul style="color: var(--muted); padding-left: 1.25rem; margin-bottom: 0.75rem;">
-                <li><a href="https://yaijs.github.io/yai/docs/yeh/" target="_blank" rel="noopener" style="color: #a78bfa;">YEH Documentation</a> — Event delegation made simple</li>
+                <li><a href="https://jsfiddle.net/hb9t3gam/" target="_blank" rel="noopener" style="color: #a78bfa;">YEH on JSF</a> — YEH toggleTarget Examples on Jsfiddle</li>
                 <li><a href="https://yaijs.github.io/yai/tabs/Example.html" target="_blank" rel="noopener" style="color: #a78bfa;">YaiTabs Live Demo</a> — Advanced tab system built on YEH</li>
+                <li><a href="https://yaijs.github.io/yai/docs/yeh/" target="_blank" rel="noopener" style="color: #a78bfa;">YEH Documentation</a> — Event delegation made simple</li>
             </ul>
             <hr />
             <pre>super({<br>  '#app':   ['click', 'input', 'submit'],<br>  'window': ['scroll']<br>})</pre>

@@ -289,6 +289,7 @@ final class ImapService
         $uidsToFetch = array_slice($uids, 0, $config->limit);
 
         $activeFields = $config->getActiveFields();
+        $messages = [];
 
         foreach ($uidsToFetch as $uid) {
             try {

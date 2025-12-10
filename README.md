@@ -15,9 +15,11 @@ A lightweight fluent IMAP client for PHP 8.1+. Decode bodies, attachments, and h
 5. [Field & Filter Reference](#field--filter-reference)
 6. [Demo Application](#demo-application)
 7. [Error Handling](#error-handling)
-8. [Development & Testing](#development--testing)
-9. [Troubleshooting](#troubleshooting)
-10. [License](#license)
+8. [Security](#security)
+9. [Development & Testing](#development--testing)
+10. [Contributing](#contributing)
+11. [Troubleshooting](#troubleshooting)
+12. [License](#license)
 
 ---
 
@@ -317,6 +319,54 @@ try {
 
 ---
 
+## Security
+
+**Important:** Never hardcode IMAP credentials in your source code.
+
+### Secure Credential Management
+
+```php
+use Yai\Ymap\ImapService;
+
+// ✓ Good: Use environment variables
+$messages = ImapService::create()
+    ->connect(
+        getenv('IMAP_MAILBOX'),
+        getenv('IMAP_USER'),
+        getenv('IMAP_PASS')
+    )
+    ->getMessages();
+
+// ✗ Bad: Hardcoded credentials
+$messages = ImapService::create()
+    ->connect('{imap.gmail.com:993/imap/ssl}INBOX', 'user@example.com', 'password')
+    ->getMessages();
+```
+
+### Secure Connections
+
+Always use SSL/TLS when connecting over untrusted networks:
+
+```php
+// ✓ Good: SSL enabled
+'{imap.gmail.com:993/imap/ssl}INBOX'
+
+// ⚠️ Warning: Disables certificate validation (development only)
+'{imap.example.com:993/imap/ssl/novalidate-cert}INBOX'
+```
+
+### Additional Security Practices
+
+- **Limit result sets** to prevent resource exhaustion (`->limit(100)`)
+- **Sanitize filenames** before saving attachments to disk
+- **Validate MIME types** when processing attachments
+- **Implement rate limiting** for web-facing IMAP operations
+- **Use field selection** to minimize data exposure (`->fields(['uid', 'subject'])`)
+
+For detailed security guidelines, vulnerability reporting, and best practices, see [SECURITY.md](SECURITY.md).
+
+---
+
 ## Development & Testing
 
 ```bash
@@ -326,6 +376,19 @@ composer install
 ```
 
 No additional tooling is required. PHPStan level is configured in `phpstan.neon`.
+
+---
+
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
+
+- Code standards and style (PHP 8.1+, strict typing, PHPStan level 8)
+- Pull request process
+- What to contribute (bug fixes, docs, tests, performance improvements)
+- How to report issues
+
+For security vulnerabilities, please see our [Security Policy](SECURITY.md) instead of opening a public issue.
 
 ---
 

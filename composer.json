@@ -3,6 +3,7 @@
     "description": "Lightweight IMAP reader/flagger for PHP 8.1+",
     "type": "library",
     "license": "MIT",
+    "minimum-stability": "stable",
     "require": {
         "php": "^8.1",
         "ext-imap": "*",
@@ -18,5 +19,17 @@
         "psr-4": {
             "Yai\\Ymap\\": "src/"
         }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "test:verbose": "phpunit --testdox",
+        "test:coverage": "phpunit --coverage-html coverage/",
+        "test:filter": "phpunit --filter",
+        "analyse": "phpstan analyse src/",
+        "analyse:baseline": "phpstan analyse src/ --generate-baseline",
+        "check": [
+            "@analyse",
+            "@test"
+        ]
     }
 }
