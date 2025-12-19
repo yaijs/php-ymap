@@ -2,8 +2,10 @@
 
 namespace Yai\Ymap;
 
+use InvalidArgumentException;
 use function addslashes;
 use function array_diff;
+use function array_intersect;
 use function array_key_exists;
 use function array_merge;
 use function array_unshift;
@@ -12,6 +14,7 @@ use function date;
 use function implode;
 use function in_array;
 use function is_array;
+use function sprintf;
 use function strtotime;
 
 /**
@@ -56,6 +59,9 @@ final class ServiceConfig
     /** @var string[] */
     public array $excludeSubjectPatterns = [];
 
+    public bool $includeAttachmentContent = false;
+    public string $attachmentContentEncoding = 'base64';
+
     /**
      * All available fields that can be returned.
      */
@@ -63,6 +69,7 @@ final class ServiceConfig
         'uid',
         'subject',
         'date',
+        'dateRaw',
         'from',
         'to',
         'cc',
@@ -75,6 +82,7 @@ final class ServiceConfig
         'seen',
         'answered',
         'preview',
+        'size',
     ];
 
     /**
@@ -114,10 +122,10 @@ final class ServiceConfig
 
         // Field selection
         if (isset($config['fields']) && is_array($config['fields'])) {
-            $instance->fields = $config['fields'];
+            $instance->setFields($config['fields']);
         }
         if (isset($config['exclude_fields']) && is_array($config['exclude_fields'])) {
-            $instance->excludeFields = $config['exclude_fields'];
+            $instance->setExcludeFields($config['exclude_fields']);
         }
 
         // Filters
@@ -198,10 +206,10 @@ final class ServiceConfig
 
         // Field overrides
         if (isset($overrides['fields']) && is_array($overrides['fields'])) {
-            $clone->fields = $overrides['fields'];
+            $clone->setFields($overrides['fields']);
         }
         if (isset($overrides['exclude_fields']) && is_array($overrides['exclude_fields'])) {
-            $clone->excludeFields = $overrides['exclude_fields'];
+            $clone->setExcludeFields($overrides['exclude_fields']);
         }
 
         // Exclusion overrides
@@ -213,6 +221,44 @@ final class ServiceConfig
         }
 
         return $clone;
+    }
+
+    /**
+     * @param string[] $fields
+     */
+    public function setFields(array $fields): void
+    {
+        $this->assertValidFields($fields);
+        $this->fields = array_values($fields);
+    }
+
+    /**
+     * @param string[] $fields
+     */
+    public function setExcludeFields(array $fields): void
+    {
+        $this->assertValidFields($fields);
+        $this->excludeFields = array_values($fields);
+    }
+
+    /**
+     * Build fetch options so the client only loads requested payloads.
+     *
+     * @param string[] $fields
+     */
+    public function buildFetchOptions(array $fields): FetchOptions
+    {
+        $options = FetchOptions::everything();
+        $needsAttachments = in_array('attachments', $fields, true);
+        $needsText = in_array('textBody', $fields, true) || in_array('preview', $fields, true);
+        $needsHtml = in_array('htmlBody', $fields, true) || in_array('preview', $fields, true);
+
+        $options = $options->withAttachments($needsAttachments);
+        $options = $options->withAttachmentContent($needsAttachments && $this->includeAttachmentContent);
+        $options = $options->withTextBody($needsText);
+        $options = $options->withHtmlBody($needsHtml);
+
+        return $options;
     }
 
     /**
@@ -286,6 +332,19 @@ final class ServiceConfig
             array_unshift($fields, 'uid');
         }
 
-        return array_values($fields);
+        return array_values(array_intersect($fields, self::AVAILABLE_FIELDS));
+    }
+
+    /**
+     * @param string[] $fields
+     */
+    private function assertValidFields(array $fields): void
+    {
+        $unknown = array_diff($fields, self::AVAILABLE_FIELDS);
+        if ([] !== $unknown) {
+            throw new InvalidArgumentException(
+                sprintf('Unknown fields requested: %s', implode(', ', $unknown))
+            );
+        }
     }
 }

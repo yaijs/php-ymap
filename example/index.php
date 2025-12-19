@@ -821,8 +821,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         .modal-content {
             width: 100%;
-            max-width: calc(1200px - 4rem);
-            max-height: 90vh;
+            max-width: calc(940px - 10rem);
+            max-height: 85vh;
             position: relative;
             z-index: 2;
             display: flex;
@@ -841,6 +841,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             transform: translateY(0);
             opacity: 1;
         }
+
+        @keyframes modal-slide-out-left {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(-60px); opacity: 0; }
+        }
+
+        @keyframes modal-slide-out-right {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(60px); opacity: 0; }
+        }
+
+        @keyframes modal-slide-in-right {
+            from { transform: translateX(60px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes modal-slide-in-left {
+            from { transform: translateX(-60px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .modal-content-inner.slide-out-left { animation: modal-slide-out-left 0.25s forwards ease; }
+        .modal-content-inner.slide-out-right { animation: modal-slide-out-right 0.25s forwards ease; }
+        .modal-content-inner.slide-in-right { animation: modal-slide-in-right 0.25s forwards ease; }
+        .modal-content-inner.slide-in-left { animation: modal-slide-in-left 0.25s forwards ease; }
 
         .modal.closing .modal-content {
             transform: translateY(100%);
@@ -1132,8 +1157,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                     <div class="form-group">
                         <label for="password">Password / App Password</label>
-                        <div class="password-wrapper">
-                            <input type="password" id="password" name="password"
+                        <div class="password-wrapper yai-password-util">
+                            <input type="password"
+                                id="password"
+                                name="password"
                                 placeholder="Generated app password"
                                 autocomplete="current-password"
                                 required>
@@ -1249,14 +1276,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <h2 style="font-size: 1.25rem;">Messages</h2>
                 <div style="display: flex; align-items: center; gap: 1rem;">
                     <span id="totalSizeDisplay" style="font-size: 0.9rem; color: var(--muted);"></span>
+
                     <button type="button"
                         class="action-btn"
-                        data-action="toggleTarget"
-                        data-target=".message-body,.message-subject"
-                        data-target-all
-                        data-toggle-class="collapsed"
-                        data-toggle-state="collapsed"
-                        data-toggle-content-self="Collapse All">
+                        data-action="toggleMessages"
+                        data-state="collapsed">
                         Expand All
                     </button>
                 </div>
@@ -1339,7 +1363,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
          * YEH-based Interactive Handler for php-ymap Demo
          * 4 event listener on 2 elements are managing everything
          */
-        import { YEH } from 'https://cdn.jsdelivr.net/npm/@yaijs/core@1.1.1/yeh/yeh.min.js';
+        import { YEH } from 'https://cdn.jsdelivr.net/npm/@yaijs/core@1.1.4/yeh/yeh.min.js';
 
         // Imap handler
         class ImapHandler extends YEH {
@@ -1355,6 +1379,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 this.messageList = [];
                 this.currentModalMessageIndex = -1;
                 this.defaultBodyLength = 5000;
+                this.lastFetchDuration = null;
+                this.isModalTransitioning = false;
                 this.init();
             }
 
@@ -1395,6 +1421,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 const messagesContainer = document.getElementById('messagesContainer');
                 const connectionCard = form.closest('.card');
 
+                const now = () => (typeof performance !== 'undefined' && performance.now)
+                    ? performance.now()
+                    : Date.now();
+                const startedAt = now();
+                this.lastFetchDuration = null;
+
                 submitBtn.disabled = true;
                 loading.classList.add('active');
                 document.body.classList.add('imap-loading');
@@ -1408,17 +1440,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     });
 
                     const data = await response.json();
+                    const elapsedSeconds = (now() - startedAt) / 1000;
 
                     if (data.success) {
+                        this.lastFetchDuration = elapsedSeconds;
                         this.showStatus('success',
                             `✓ Connected! Found ${data.count} of ${data.totalFound} message(s).`,
                             data.searchCriteria !== 'ALL' ? data.searchCriteria : null
                         );
                         this.renderMessages(data.messages);
                     } else {
+                        this.lastFetchDuration = null;
                         this.showStatus('error', data.error);
                     }
                 } catch (e) {
+                    this.lastFetchDuration = null;
                     this.showStatus('error', 'Network error: ' + e.message);
                 } finally {
                     submitBtn.disabled = false;
@@ -1445,18 +1481,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 this.messageCache = new Map();
                 this.messageList = [];
 
-                if (messages.length === 0) {
-                    container.style.display = 'block';
-                    list.innerHTML = `
-                        <div class="card empty-state">
-                            <p>No messages found matching your criteria.</p>
-                        </div>
-                    `;
-                    totalSizeDisplay.textContent = '';
-                    return;
-                }
-
-                // Calculate total size
                 let totalSize = 0;
                 messages.forEach(msg => {
                     this.messageCache.set(String(msg.uid), msg);
@@ -1464,16 +1488,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     totalSize += msg.size || 0;
                 });
 
-                // Format and display total size
-                const formattedTotal = totalSize >= 1048576
-                    ? (totalSize / 1048576).toFixed(1) + ' MB'
-                    : totalSize >= 1024
-                    ? (totalSize / 1024).toFixed(1) + ' KB'
-                    : totalSize + ' B';
-                totalSizeDisplay.textContent = `Total: ${formattedTotal} (${messages.length} message${messages.length !== 1 ? 's' : ''})`;
-
+                totalSizeDisplay.textContent = this.formatTotalSummary(totalSize, messages.length);
                 container.style.display = 'block';
+                if (messages.length === 0) {
+                    list.innerHTML = `
+                        <div class="card empty-state">
+                            <p>No messages found matching your criteria.</p>
+                        </div>
+                    `;
+                    this.setMassToggleButtonState('collapsed');
+                    return;
+                }
+
                 list.innerHTML = messages.map(msg => this.renderMessage(msg)).join('');
+                this.setMassToggleButtonState('collapsed');
             }
 
             renderMessage(msg) {
@@ -1489,12 +1517,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     classes.push('message--answered');
                 }
                 const messageClass = classes.join(' ');
+                const subjectClass = 'message-subject collapsed';
 
                 return `
                     <div class="${messageClass}" data-uid="${msg.uid}">
                         <div class="message-header">
                             <div>
-                                <div class="message-subject" data-action="toggleBody">
+                                <div class="${subjectClass}" data-action="toggleBody">
                                     ${msg.subject ? this.escapeHtml(msg.subject) : '<em style="color:var(--muted)">(No subject)</em>'}
                                 </div>
                             </div>
@@ -1600,15 +1629,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 `;
             }
 
+            formatTotalSummary(totalBytes, messageCount) {
+                const durationLabel = typeof this.lastFetchDuration === 'number'
+                    ? `(${this.formatDuration(this.lastFetchDuration)} s) `
+                    : '';
+                const formattedTotal = this.formatByteSize(totalBytes);
+                const suffix = messageCount === 1 ? 'message' : 'messages';
+
+                return `${durationLabel}Total: ${formattedTotal} (${messageCount} ${suffix})`;
+            }
+
+            formatByteSize(bytes) {
+                if (bytes >= 1048576) {
+                    return (bytes / 1048576).toFixed(1) + ' MB';
+                }
+
+                if (bytes >= 1024) {
+                    return (bytes / 1024).toFixed(1) + ' KB';
+                }
+
+                return bytes + ' B';
+            }
+
+            formatDuration(seconds) {
+                const fixed = seconds.toFixed(4);
+
+                return fixed.length < 7 ? fixed.padStart(7, '0') : fixed;
+            }
+
             // Toggle message body
             toggleBody(target) {
                 const message = target.closest('.message');
-                const body = message?.querySelector('.message-body');
+                const messageBody = message?.querySelector('.message-body');
 
-                if (body) {
-                    body.classList.toggle('collapsed');
+                if (messageBody) {
+                    messageBody.classList.toggle('collapsed');
                     target.classList.toggle('collapsed');
                 }
+            }
+
+            toggleMessages(target) {
+                if (!this.messageList.length) {
+                    this.showToast('No messages to toggle', true);
+                    return;
+                }
+
+                const shouldExpand = target.dataset.state !== 'expanded';
+                const bodies = document.querySelectorAll('.message-body');
+                const subjects = document.querySelectorAll('.message-subject');
+
+                bodies.forEach(body => body.classList.toggle('collapsed', !shouldExpand));
+                subjects.forEach(subject => subject.classList.toggle('collapsed', !shouldExpand));
+
+                const nextState = shouldExpand ? 'expanded' : 'collapsed';
+                this.setMassToggleButtonState(nextState, target);
             }
 
             openModal(target) {
@@ -1622,7 +1696,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 this.showMessageInModal(uid);
             }
 
-            showMessageInModal(uid) {
+            showMessageInModal(uid, skipEntranceAnimation = false) {
                 if (!this.messageCache.has(uid)) {
                     this.showToast('Message not available', true);
                     return;
@@ -1655,16 +1729,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Update navigation button states
                 this.updateModalNavButtons();
 
-                // First set display to flex (without animation class)
+                if (skipEntranceAnimation) {
+                    if (!modal.classList.contains('show')) {
+                        modal.style.display = 'flex';
+                        document.body.classList.add('modal-open');
+                        modal.classList.add('show');
+                    }
+                    return;
+                }
+
                 modal.style.display = 'flex';
                 document.body.classList.add('modal-open');
-
-                // Force a reflow to ensure display change is applied
                 modal.offsetHeight;
-
-                // Then add the show class to trigger animation
                 requestAnimationFrame(() => {
                     modal.classList.add('show');
+                });
+            }
+
+            async animateModalSwap(direction, uid) {
+                if (this.isModalTransitioning) {
+                    return;
+                }
+
+                const modal = document.getElementById('messageModal');
+                const inner = modal?.querySelector('.modal-content-inner');
+
+                if (!inner) {
+                    this.showMessageInModal(uid, true);
+                    return;
+                }
+
+                this.isModalTransitioning = true;
+                const outClass = direction === 'next' ? 'slide-out-left' : 'slide-out-right';
+                const inClass = direction === 'next' ? 'slide-in-right' : 'slide-in-left';
+
+                await this.runModalAnimation(inner, outClass);
+                this.showMessageInModal(uid, true);
+                await this.runModalAnimation(inner, inClass);
+
+                this.isModalTransitioning = false;
+            }
+
+            runModalAnimation(element, className) {
+                return new Promise(resolve => {
+                    if (!className) {
+                        resolve();
+                        return;
+                    }
+
+                    const cleanup = () => {
+                        element.classList.remove(className);
+                        element.removeEventListener('animationend', cleanup);
+                        resolve();
+                    };
+
+                    element.addEventListener('animationend', cleanup, { once: true });
+                    element.classList.add(className);
                 });
             }
 
@@ -1681,14 +1801,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             openPreviousMessage() {
                 if (this.currentModalMessageIndex > 0) {
                     const prevUid = this.messageList[this.currentModalMessageIndex - 1];
-                    this.showMessageInModal(prevUid);
+                    this.animateModalSwap('prev', prevUid);
                 }
             }
 
             openNextMessage() {
                 if (this.currentModalMessageIndex < this.messageList.length - 1) {
                     const nextUid = this.messageList[this.currentModalMessageIndex + 1];
-                    this.showMessageInModal(nextUid);
+                    this.animateModalSwap('next', nextUid);
                 }
             }
 
@@ -1846,16 +1966,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 setTimeout(() => toast.classList.remove('show'), 2500);
             }
 
-            togglePassword(target) {
-                const input = document.getElementById('password');
+            togglePassword(target, event, container) {
+                const passwordWrapper = target.parentNode;
+                if (!passwordWrapper.classList.contains('yai-password-util')) return;
+
+                const input = passwordWrapper.querySelector('input[type]');
+                if (!input) return;
+
                 const isPassword = input.type === 'password';
                 input.type = isPassword ? 'text' : 'password';
                 if (!target.hasAttribute('data-default-content')) {
                     target.setAttribute('data-default-content', target.textContent.trim());
                 }
-                target.textContent = isPassword
-                    ? target.dataset.toggleContent
-                    : target.dataset.defaultContent;
+
+                target.textContent = isPassword ? target.dataset.toggleContent : target.dataset.defaultContent;
             }
 
             /**
@@ -2055,6 +2179,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     target.removeAttribute('data-action');
                     target.disabled = true;
                 }
+            }
+
+            setMassToggleButtonState(state = 'collapsed', control = null) {
+                const button = control ?? document.querySelector('[data-action="toggleMessages"]');
+                if (!button) return;
+
+                const isExpanded = state === 'expanded';
+                button.dataset.state = state;
+                button.classList.toggle('btn-active', isExpanded);
+                button.textContent = isExpanded ? 'Collapse All' : 'Expand All';
             }
 
         }

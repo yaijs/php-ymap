@@ -2,11 +2,15 @@
 
 namespace Yai\Ymap;
 
+use InvalidArgumentException;
+use Yai\Ymap\Connection\ExtImapConnection;
+use Yai\Ymap\Connection\ImapConnectionInterface;
 use Yai\Ymap\Exceptions\ConnectionException;
 use Yai\Ymap\Exceptions\MessageFetchException;
 use function array_reverse;
 use function array_slice;
 use function count;
+use function base64_encode;
 use function mb_stripos;
 
 /**
@@ -17,7 +21,15 @@ final class ImapService
 {
     private ServiceConfig $config;
 
-    private ?ImapClient $client = null;
+    private ?ImapClientInterface $client = null;
+
+    private ?ImapConnectionInterface $connection = null;
+
+    /** @var callable */
+    private $clientFactory;
+
+    /** @var callable|null */
+    private $errorHandler = null;
 
     /**
      * @param array<string, mixed> $config
@@ -25,6 +37,9 @@ final class ImapService
     public function __construct(array $config = [])
     {
         $this->config = ServiceConfig::fromArray($config);
+        $this->clientFactory = function (ConnectionConfig $connectionConfig, string $encoding): ImapClientInterface {
+            return new ImapClient($connectionConfig, $encoding, $this->connection);
+        };
     }
 
     /**
@@ -48,10 +63,11 @@ final class ImapService
         string $password,
         int $options = 0,
         int $retries = 0,
-        array $parameters = []
+        array $parameters = [],
+        ?ImapConnectionInterface $connection = null
     ): bool {
         $config = new ConnectionConfig($mailbox, $username, $password, $options, $retries, $parameters);
-        $client = new ImapClient($config);
+        $client = new ImapClient($config, 'UTF-8', $connection);
 
         try {
             $client->connect();
@@ -102,7 +118,7 @@ final class ImapService
      */
     public function fields(array $fields): self
     {
-        $this->config->fields = $fields;
+        $this->config->setFields($fields);
 
         return $this;
     }
@@ -114,7 +130,7 @@ final class ImapService
      */
     public function excludeFields(array $fields): self
     {
-        $this->config->excludeFields = $fields;
+        $this->config->setExcludeFields($fields);
 
         return $this;
     }
@@ -264,6 +280,75 @@ final class ImapService
     }
 
     /**
+     * Control whether the attachments array should include content payloads (base64 encoded).
+     */
+    public function includeAttachmentContent(bool $flag = true, string $encoding = 'base64'): self
+    {
+        $encoding = strtolower($encoding);
+        if (!in_array($encoding, ['base64', 'binary'], true)) {
+            throw new InvalidArgumentException('Attachment content encoding must be "base64" or "binary".');
+        }
+
+        $this->config->includeAttachmentContent = $flag;
+        $this->config->attachmentContentEncoding = $encoding;
+
+        return $this;
+    }
+
+    /**
+     * Provide a shared IMAP client instance (useful for dependency injection and testing).
+     */
+    public function useClient(ImapClientInterface $client): self
+    {
+        $this->client = $client;
+
+        return $this;
+    }
+
+    /**
+     * Force the service to use a specific IMAP connector implementation.
+     */
+    public function useConnection(ImapConnectionInterface $connection): self
+    {
+        $this->connection = $connection;
+        $this->client = null;
+
+        return $this;
+    }
+
+    /**
+     * Convenience helper to explicitly switch back to the ext-imap connector.
+     */
+    public function useExtImap(): self
+    {
+        return $this->useConnection(new ExtImapConnection());
+    }
+
+    /**
+     * Override the factory responsible for creating ImapClient instances.
+     *
+     * @param callable(ConnectionConfig, string):ImapClientInterface $factory
+     */
+    public function withClientFactory(callable $factory): self
+    {
+        $this->clientFactory = $factory;
+
+        return $this;
+    }
+
+    /**
+     * Register an error handler invoked when individual messages fail to fetch.
+     *
+     * @param callable(int, \Throwable):void $handler
+     */
+    public function onError(callable $handler): self
+    {
+        $this->errorHandler = $handler;
+
+        return $this;
+    }
+
+    /**
      * Fetch messages with optional runtime overrides.
      *
      * @param array<string, mixed> $overrides Runtime filter overrides
@@ -289,20 +374,24 @@ final class ImapService
         $uidsToFetch = array_slice($uids, 0, $config->limit);
 
         $activeFields = $config->getActiveFields();
+        $fetchOptions = $config->buildFetchOptions($activeFields);
         $messages = [];
 
         foreach ($uidsToFetch as $uid) {
             try {
-                $message = $client->fetchMessage($uid);
+                $message = $client->fetchMessage($uid, $fetchOptions);
 
                 // Post-fetch exclusion filters
                 if ($this->shouldExclude($message, $config)) {
                     continue;
                 }
 
-                $messages[] = $this->messageToArray($message, $activeFields);
+                $messages[] = $this->messageToArray($message, $activeFields, $config);
             } catch (MessageFetchException $e) {
-                // Skip problematic messages
+                if (null !== $this->errorHandler) {
+                    ($this->errorHandler)($uid, $e);
+                }
+
                 continue;
             }
         }
@@ -322,11 +411,16 @@ final class ImapService
         $client = $this->getClient();
 
         try {
-            $message = $client->fetchMessage($uid);
+            $fetchOptions = $this->config->buildFetchOptions($this->config->getActiveFields());
+            $message = $client->fetchMessage($uid, $fetchOptions);
             $activeFields = $this->config->getActiveFields();
 
-            return $this->messageToArray($message, $activeFields);
+            return $this->messageToArray($message, $activeFields, $this->config);
         } catch (MessageFetchException $e) {
+            if (null !== $this->errorHandler) {
+                ($this->errorHandler)($uid, $e);
+            }
+
             return null;
         }
     }
@@ -437,7 +531,7 @@ final class ImapService
      *
      * @throws ConnectionException
      */
-    private function getClient(): ImapClient
+    private function getClient(): ImapClientInterface
     {
         if (null !== $this->client) {
             return $this->client;
@@ -456,10 +550,12 @@ final class ImapService
             $this->config->parameters
         );
 
-        $this->client = new ImapClient($connectionConfig, $this->config->encoding);
-        $this->client->connect();
+        /** @var ImapClientInterface $client */
+        $client = ($this->clientFactory)($connectionConfig, $this->config->encoding);
+        $client->connect();
+        $this->client = $client;
 
-        return $this->client;
+        return $client;
     }
 
     /**
@@ -499,7 +595,7 @@ final class ImapService
      *
      * @return array<string, mixed>
      */
-    private function messageToArray(Message $message, array $fields): array
+    private function messageToArray(Message $message, array $fields, ServiceConfig $config): array
     {
         $result = [];
 
@@ -516,7 +612,7 @@ final class ImapService
                 'replyTo' => $this->addressesToArray($message->getReplyTo()),
                 'textBody' => $message->getTextBody(),
                 'htmlBody' => $message->getHtmlBody(),
-                'attachments' => $this->attachmentsToArray($message->getAttachments()),
+                'attachments' => $this->attachmentsToArray($message->getAttachments(), $config),
                 'headers' => $message->getHeaders(),
                 'seen' => $message->isSeen(),
                 'answered' => $message->isAnswered(),
@@ -557,17 +653,27 @@ final class ImapService
      *
      * @return array<int, array{filename: string, size: int, mimeType: string, isInline: bool}>
      */
-    private function attachmentsToArray(array $attachments): array
+    private function attachmentsToArray(array $attachments, ServiceConfig $config): array
     {
         $result = [];
+        $includeContent = $config->includeAttachmentContent;
 
         foreach ($attachments as $attachment) {
-            $result[] = [
+            $entry = [
                 'filename' => $attachment->getFilename(),
                 'size' => $attachment->getSize(),
                 'mimeType' => $attachment->getMimeType(),
                 'isInline' => $attachment->isInline(),
             ];
+
+            if ($includeContent) {
+                $binary = $attachment->getContent();
+                $entry['content'] = 'binary' === $config->attachmentContentEncoding
+                    ? $binary
+                    : base64_encode($binary);
+            }
+
+            $result[] = $entry;
         }
 
         return $result;

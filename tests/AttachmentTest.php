@@ -18,6 +18,7 @@ final class AttachmentTest extends TestCase
         $this->assertSame('document.pdf', $attachment->getFilename());
         $this->assertSame('application/pdf', $attachment->getMimeType());
         $this->assertSame('PDF content here', $attachment->getContent());
+        $this->assertTrue($attachment->hasContent());
         $this->assertFalse($attachment->isInline());
         $this->assertNull($attachment->getContentId());
     }
@@ -77,5 +78,19 @@ final class AttachmentTest extends TestCase
             $this->assertSame($mimeType, $attachment->getMimeType());
             $this->assertSame($filename, $attachment->getFilename());
         }
+    }
+
+    public function testAttachmentLazyLoaderLoadsContentOnDemand(): void
+    {
+        $attachment = new Attachment('lazy.txt', 'text/plain', null);
+        $attachment->setContentLoader(static function (): string {
+            return 'lazy payload';
+        });
+        $attachment->setSize(4096);
+
+        $this->assertFalse($attachment->hasContent());
+        $this->assertSame('lazy payload', $attachment->getContent());
+        $this->assertTrue($attachment->hasContent());
+        $this->assertSame(strlen('lazy payload'), $attachment->getSize());
     }
 }

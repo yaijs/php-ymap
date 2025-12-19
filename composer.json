@@ -20,16 +20,5 @@
             "Yai\\Ymap\\": "src/"
         }
     },
-    "scripts": {
-        "test": "phpunit",
-        "test:verbose": "phpunit --testdox",
-        "test:coverage": "phpunit --coverage-html coverage/",
-        "test:filter": "phpunit --filter",
-        "analyse": "phpstan analyse src/",
-        "analyse:baseline": "phpstan analyse src/ --generate-baseline",
-        "check": [
-            "@analyse",
-            "@test"
-        ]
-    }
+    "suggest": {}
 }

@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2025-12-19
+
+### Added
+- **Connection Abstraction Layer (PHP 8.4 Future-Proofing)**
+  - `ImapConnectionInterface` - Abstraction layer for IMAP protocol operations
+  - `ExtImapConnection` - Clean wrapper around native `imap_*` functions
+  - Constructor injection support in `ImapClient` for custom connection implementations
+  - Fully mockable architecture for unit testing
+  - Paves the way for pure PHP/socket implementation in v2.0
+
+- **Memory Optimization**
+  - `FetchOptions` value object for granular control over what gets loaded
+  - `saveAttachmentTo()` streaming method to save large attachments without memory loading
+  - Lazy-loading support in `Attachment` class
+  - Field-aware parsing - only fetch requested data
+
+- **Testing Infrastructure**
+  - `ServiceConfigTest.php` for configuration validation
+  - Enhanced `AttachmentTest.php` with edge cases
+  - GitHub Actions CI workflow for PHP 8.1/8.2/8.3
+  - PHPUnit + PHPStan Level 8 validation
+
+- **Documentation**
+  - Performance & Production Readiness section with real-world benchmarks
+  - Plugin Integration guide with best practices
+  - Memory Optimization with FetchOptions examples
+  - Secure Attachment Handling with sanitization code
+  - Dependency Injection & Testing guide with mocking examples
+
+### Changed
+- **Architecture:** ImapClient now uses dependency injection for connection layer
+- **Error Handling:** Improved error transparency for production debugging
+- **Field Validation:** Strict validation of requested fields with helpful exceptions
+
+### Performance
+- **Real-world benchmarks** across Gmail, ok.de, and IONOS
+  - ok.de: ~105ms per message
+  - IONOS: ~230ms per message
+  - Gmail: ~226ms per message
+- **60-80% reduction** in memory usage for list views with FetchOptions
+- **Linear scaling** up to 100 messages with 18MB+ datasets
+
+### Security
+- Path traversal protection guidelines
+- Attachment filename sanitization examples
+- Secure defaults in FetchOptions (attachment content off by default)
+
+### Files Modified
+- `src/Connection/ImapConnectionInterface.php` - New interface (15 methods)
+- `src/Connection/ExtImapConnection.php` - New implementation
+- `src/ImapClient.php` - Added connection injection support
+- `src/FetchOptions.php` - New value object for fetch control
+- `tests/ServiceConfigTest.php` - New test file
+- `README.md` - Major documentation enhancements
+
+[1.0.2]: https://github.com/yaijs/php-ymap/releases/tag/v1.0.2
+
 ## [1.0.1] - 2025-12-10
 
 ### Fixed
@@ -124,7 +181,7 @@ Have a feature request? Open an issue on GitHub or submit a PR!
 2. Additional IMAP server compatibility testing
 3. Performance benchmarks and optimizations
 4. Documentation improvements and examples
-5. Integration guides for popular frameworks (Laravel, Symfony, Shopware)
+5. Integration guides for popular frameworks (Laravel, Symfony, etc.)
 
 ---
 

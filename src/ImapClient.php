@@ -7,7 +7,6 @@ use Exception;
 use Yai\Ymap\Exceptions\ConnectionException;
 use Yai\Ymap\Exceptions\ImapException;
 use Yai\Ymap\Exceptions\MessageFetchException;
-use const CL_EXPUNGE;
 use const ENC7BIT;
 use const ENC8BIT;
 use const ENCBASE64;
@@ -21,28 +20,15 @@ use const ST_UID;
 use const TYPEMESSAGE;
 use const TYPEMULTIPART;
 use const TYPETEXT;
+use Yai\Ymap\Connection\ExtImapConnection;
+use Yai\Ymap\Connection\ImapConnectionInterface;
 use function array_filter;
 use function array_map;
 use function array_unique;
-use function assert;
 use function base64_decode;
 use function count;
 use function explode;
 use function iconv;
-use function imap_body;
-use function imap_clearflag_full;
-use function imap_close;
-use function imap_errors;
-use function imap_fetchbody;
-use function imap_fetch_overview;
-use function imap_fetchheader;
-use function imap_fetchstructure;
-use function imap_last_error;
-use function imap_mime_header_decode;
-use function imap_open;
-use function imap_rfc822_parse_headers;
-use function imap_search;
-use function imap_setflag_full;
 use function implode;
 use function in_array;
 use function is_array;
@@ -60,7 +46,7 @@ use function trim;
 /**
  * Minimal IMAP client that can read emails and toggle read/unread flags.
  */
-final class ImapClient
+final class ImapClient implements ImapClientInterface
 {
     private const DEFAULT_ATTACHMENT_NAME = 'attachment';
 
@@ -70,12 +56,18 @@ final class ImapClient
 
     private string $targetEncoding;
 
-    private ?\IMAP\Connection $stream = null;
+    private ImapConnectionInterface $connection;
 
-    public function __construct(ConnectionConfig $config, string $targetEncoding = 'UTF-8')
-    {
+    private mixed $stream = null;
+
+    public function __construct(
+        ConnectionConfig $config,
+        string $targetEncoding = 'UTF-8',
+        ?ImapConnectionInterface $connection = null
+    ) {
         $this->config = $config;
         $this->targetEncoding = $targetEncoding;
+        $this->connection = $connection ?? new ExtImapConnection();
     }
 
     public function __destruct()
@@ -92,22 +84,26 @@ final class ImapClient
             return;
         }
 
-        $resource = @imap_open(
-            $this->config->getMailboxPath(),
-            $this->config->getUsername(),
-            $this->config->getPassword(),
-            $this->config->getOptions(),
-            $this->config->getRetries(),
-            $this->config->getParameters()
-        );
+        try {
+            $resource = $this->connection->open(
+                $this->config->getMailboxPath(),
+                $this->config->getUsername(),
+                $this->config->getPassword(),
+                $this->config->getOptions(),
+                $this->config->getRetries(),
+                $this->config->getParameters()
+            );
+        } catch (ConnectionException $exception) {
+            throw new ConnectionException(
+                sprintf('Unable to connect to mailbox "%s": %s', $this->config->getMailboxPath(), $exception->getMessage()),
+                (int) $exception->getCode(),
+                $exception
+            );
+        }
 
         if (false === $resource) {
             throw new ConnectionException(
-                sprintf(
-                    'Unable to connect to mailbox "%s": %s',
-                    $this->config->getMailboxPath(),
-                    $this->collectLastError()
-                )
+                sprintf('Unable to connect to mailbox "%s": %s', $this->config->getMailboxPath(), $this->collectLastError())
             );
         }
 
@@ -120,7 +116,7 @@ final class ImapClient
             return;
         }
 
-        imap_close($this->stream, $expunge ? CL_EXPUNGE : 0);
+        $this->connection->close($this->stream, $expunge);
         $this->stream = null;
     }
 
@@ -132,12 +128,7 @@ final class ImapClient
     public function search(string $criteria = 'ALL'): array
     {
         $stream = $this->stream();
-        $result = imap_search($stream, $criteria, SE_UID);
-
-        if (false === $result) {
-            return [];
-        }
-
+        $result = $this->connection->search($stream, $criteria, SE_UID);
         sort($result, SORT_NUMERIC);
 
         return $result;
@@ -157,10 +148,11 @@ final class ImapClient
      * @throws ConnectionException
      * @throws MessageFetchException
      */
-    public function fetchMessage(int $uid): Message
+    public function fetchMessage(int $uid, ?FetchOptions $options = null): Message
     {
+        $options ??= FetchOptions::everything();
         $stream = $this->stream();
-        $rawHeader = imap_fetchheader($stream, $uid, FT_UID);
+        $rawHeader = $this->connection->fetchHeader($stream, $uid, FT_UID);
 
         if (false === $rawHeader) {
             throw new MessageFetchException(
@@ -169,7 +161,7 @@ final class ImapClient
         }
 
         /** @var \stdClass|false $headerObject */
-        $headerObject = imap_rfc822_parse_headers($rawHeader);
+        $headerObject = $this->connection->parseHeader($rawHeader);
         if (false === $headerObject) {
             throw new MessageFetchException(
                 sprintf('Unable to parse headers for UID %d: %s', $uid, $this->collectLastError())
@@ -201,27 +193,31 @@ final class ImapClient
             $message->addReplyTo($address);
         }
 
-        $structure = imap_fetchstructure($stream, $uid, FT_UID);
+        $structure = $this->connection->fetchStructure($stream, $uid, FT_UID);
         if (false === $structure) {
             throw new MessageFetchException(
                 sprintf('Unable to fetch structure for UID %d: %s', $uid, $this->collectLastError())
             );
         }
 
-        $overview = imap_fetch_overview($stream, (string) $uid, FT_UID);
-        if (false !== $overview && isset($overview[0])) {
+        $overview = $this->connection->fetchOverview($stream, (string) $uid, FT_UID);
+        if (isset($overview[0])) {
             $message->setSeen(!empty($overview[0]->seen));
             $message->setAnswered(!empty($overview[0]->answered));
         }
 
-        $this->parseStructure($message, $structure, $uid);
+        $this->parseStructure($message, $structure, $uid, $options);
 
-        // Calculate message size from content only (text + HTML + attachments)
-        $size = strlen($message->getTextBody() ?? '') + strlen($message->getHtmlBody() ?? '');
+        $calculatedSize = strlen($message->getTextBody() ?? '') + strlen($message->getHtmlBody() ?? '');
         foreach ($message->getAttachments() as $attachment) {
-            $size += $attachment->getSize();
+            $calculatedSize += $attachment->getSize();
         }
-        $message->setSize($size);
+
+        if (0 === $calculatedSize && isset($overview[0]->size)) {
+            $calculatedSize = (int) $overview[0]->size;
+        }
+
+        $message->setSize($calculatedSize);
 
         return $message;
     }
@@ -284,7 +280,7 @@ final class ImapClient
         }
 
         $stream = $this->stream();
-        if (false === imap_setflag_full($stream, $sequence, $flag, ST_UID)) {
+        if (false === $this->connection->setFlag($stream, $sequence, $flag, ST_UID)) {
             throw new ImapException(
                 sprintf('Unable to set flag %s on %s: %s', $flag, $sequence, $this->collectLastError())
             );
@@ -305,7 +301,7 @@ final class ImapClient
         }
 
         $stream = $this->stream();
-        if (false === imap_clearflag_full($stream, $sequence, $flag, ST_UID)) {
+        if (false === $this->connection->clearFlag($stream, $sequence, $flag, ST_UID)) {
             throw new ImapException(
                 sprintf('Unable to clear flag %s on %s: %s', $flag, $sequence, $this->collectLastError())
             );
@@ -313,28 +309,46 @@ final class ImapClient
     }
 
     /**
+     * Stream attachment content directly to a file or resource using IMAP.
+     *
+     * @param resource|string $destination
+     *
+     * @throws ConnectionException
+     * @throws ImapException
+     */
+    public function saveAttachmentTo(int $uid, Attachment $attachment, $destination): void
+    {
+        $partNumber = $attachment->getPartNumber();
+        if (null === $partNumber) {
+            throw new ImapException('Attachment is missing the part number required for streaming.');
+        }
+
+        $stream = $this->stream();
+        $result = $this->connection->saveBody($stream, $destination, $uid, $partNumber, FT_UID | FT_PEEK);
+
+        if (false === $result) {
+            throw new ImapException(
+                sprintf('Unable to stream attachment %s: %s', $attachment->getFilename(), $this->collectLastError())
+            );
+        }
+    }
+
+    /**
      * @throws ConnectionException
      */
-    private function stream(): \IMAP\Connection
+    private function stream(): mixed
     {
         if (null === $this->stream) {
             $this->connect();
         }
-
-        assert($this->stream !== null);
 
         return $this->stream;
     }
 
     private function collectLastError(): string
     {
-        $errors = imap_errors() ?: [];
-        $lastError = imap_last_error();
-
-        if ($lastError && !in_array($lastError, $errors, true)) {
-            $errors[] = $lastError;
-        }
-
+        $errors = $this->connection->errors();
+        $this->connection->alertsClear();
         $message = implode('; ', array_unique(array_filter($errors)));
 
         return $message ?: 'Unknown IMAP error';
@@ -360,19 +374,19 @@ final class ImapClient
         return implode(',', $uids);
     }
 
-    private function parseStructure(Message $message, object $structure, int $uid): void
+    private function parseStructure(Message $message, object $structure, int $uid, FetchOptions $options): void
     {
         $isSinglePartMessage = empty($structure->parts);
 
         if (!$isSinglePartMessage) {
             foreach ($structure->parts as $index => $part) {
-                $this->parsePart($message, $part, $uid, (string) ($index + 1), false);
+                $this->parsePart($message, $part, $uid, (string) ($index + 1), false, $options);
             }
 
             return;
         }
 
-        $this->parsePart($message, $structure, $uid, '1', true);
+        $this->parsePart($message, $structure, $uid, '1', true, $options);
     }
 
     private function parsePart(
@@ -380,15 +394,36 @@ final class ImapClient
         object $part,
         int $uid,
         string $partNumber,
-        bool $isSinglePartMessage
+        bool $isSinglePartMessage,
+        FetchOptions $options
     ): void
     {
         // If this part has sub-parts, recurse into them and DON'T fetch body for this container
         if (!empty($part->parts)) {
             foreach ($part->parts as $index => $subPart) {
-                $this->parsePart($message, $subPart, $uid, $partNumber . '.' . ($index + 1), false);
+                $this->parsePart($message, $subPart, $uid, $partNumber . '.' . ($index + 1), false, $options);
             }
             // Don't fetch body for multipart containers - they contain MIME boundaries, not content
+            return;
+        }
+
+        if ($this->isAttachmentPart($part)) {
+            if (!$options->shouldFetchAttachments()) {
+                return;
+            }
+
+            $attachment = $this->createAttachment($part, $uid, $partNumber, $isSinglePartMessage, $options);
+            if (null !== $attachment) {
+                $message->addAttachment($attachment);
+            }
+
+            return;
+        }
+
+        $needsText = $options->shouldFetchTextBody() && $this->isTextPart($part, 'PLAIN');
+        $needsHtml = $options->shouldFetchHtmlBody() && $this->isTextPart($part, 'HTML');
+
+        if (!$needsText && !$needsHtml) {
             return;
         }
 
@@ -399,27 +434,9 @@ final class ImapClient
 
         $decodedBody = $this->decodeBody($body, (int) ($part->encoding ?? ENC7BIT));
 
-        if ($this->isAttachmentPart($part)) {
-            $message->addAttachment(
-                new Attachment(
-                    $this->resolveAttachmentName($part, $partNumber),
-                    $this->resolveMimeType($part),
-                    $decodedBody,
-                    $this->isInlinePart($part),
-                    isset($part->id) ? trim((string) $part->id, '<>') : null
-                )
-            );
-
-            return;
-        }
-
-        if ($this->isTextPart($part, 'PLAIN')) {
+        if ($needsText) {
             $message->appendTextBody($this->convertEncoding($decodedBody, $this->extractCharset($part)));
-
-            return;
-        }
-
-        if ($this->isTextPart($part, 'HTML')) {
+        } elseif ($needsHtml) {
             $message->appendHtmlBody($this->convertEncoding($decodedBody, $this->extractCharset($part)));
         }
     }
@@ -429,9 +446,9 @@ final class ImapClient
         $stream = $this->stream();
 
         if ($singlePartMessage && '1' === $partNumber) {
-            $body = imap_body($stream, $uid, FT_UID | FT_PEEK);
+            $body = $this->connection->body($stream, $uid, FT_UID | FT_PEEK);
         } else {
-            $body = imap_fetchbody($stream, $uid, $partNumber, FT_UID | FT_PEEK);
+            $body = $this->connection->fetchBody($stream, $uid, $partNumber, FT_UID | FT_PEEK);
         }
 
         if (false === $body || '' === $body) {
@@ -510,10 +527,20 @@ final class ImapClient
     {
         $name = $this->extractParameter($part, 'filename') ?? $this->extractParameter($part, 'name');
         if (null !== $name) {
-            return $this->decodeMimeHeader($name) ?? self::DEFAULT_ATTACHMENT_NAME;
+            $decoded = $this->decodeMimeHeader($name) ?? self::DEFAULT_ATTACHMENT_NAME;
+
+            return $this->sanitizeFilename($decoded);
         }
 
-        return sprintf('%s-%s', self::DEFAULT_ATTACHMENT_NAME, $fallback);
+        return $this->sanitizeFilename(sprintf('%s-%s', self::DEFAULT_ATTACHMENT_NAME, $fallback));
+    }
+
+    private function sanitizeFilename(string $filename): string
+    {
+        $sanitized = preg_replace('/[^\w\-. ]+/', '_', $filename) ?? '';
+        $sanitized = trim($sanitized, " \t\n\r\0\x0B._-");
+
+        return $sanitized ?: self::DEFAULT_ATTACHMENT_NAME;
     }
 
     private function resolveMimeType(object $part): string
@@ -610,15 +637,15 @@ final class ImapClient
             return $value;
         }
 
-        $decoded = imap_mime_header_decode($value);
-        if (false === $decoded) {
+        $decoded = $this->connection->mimeHeaderDecode($value);
+        if ([] === $decoded) {
             return $value;
         }
         $result = '';
 
         foreach ($decoded as $segment) {
             $charset = $segment->charset ?? 'default';
-            $text = (string) $segment->text;
+            $text = isset($segment->text) ? (string) $segment->text : '';
 
             if ('default' !== strtolower($charset) && '' !== $charset) {
                 $converted = @iconv($charset, $this->targetEncoding . '//TRANSLIT', $text);
@@ -669,5 +696,51 @@ final class ImapClient
         }
 
         return $result;
+    }
+
+    private function createAttachment(
+        object $part,
+        int $uid,
+        string $partNumber,
+        bool $isSinglePartMessage,
+        FetchOptions $options
+    ): Attachment {
+        $filename = $this->resolveAttachmentName($part, $partNumber);
+        $mimeType = $this->resolveMimeType($part);
+        $contentId = isset($part->id) ? trim((string) $part->id, '<>') : null;
+        $size = isset($part->bytes) ? (int) $part->bytes : null;
+        $content = null;
+        $loader = null;
+
+        if ($options->shouldFetchAttachmentContent()) {
+            $body = $this->fetchPartBody($uid, $partNumber, $isSinglePartMessage);
+            if (null !== $body) {
+                $content = $this->decodeBody($body, (int) ($part->encoding ?? ENC7BIT));
+                $size = strlen($content);
+            } else {
+                $content = '';
+                $size ??= 0;
+            }
+        } else {
+            $loader = function () use ($uid, $partNumber, $isSinglePartMessage, $part): string {
+                $body = $this->fetchPartBody($uid, $partNumber, $isSinglePartMessage);
+                if (null === $body) {
+                    return '';
+                }
+
+                return $this->decodeBody($body, (int) ($part->encoding ?? ENC7BIT));
+            };
+        }
+
+        return new Attachment(
+            $filename,
+            $mimeType,
+            $content,
+            $this->isInlinePart($part),
+            $contentId,
+            $size,
+            $partNumber,
+            $loader
+        );
     }
 }

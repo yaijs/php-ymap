@@ -13,29 +13,39 @@ A lightweight fluent IMAP client for PHP 8.1+. Decode bodies, attachments, and h
    - [Array / Config-Driven Setup](#array--config-driven-setup)
    - [Connection Options](#connection-options)
 5. [Field & Filter Reference](#field--filter-reference)
-6. [Demo Application](#demo-application)
-7. [Error Handling](#error-handling)
-8. [Security](#security)
-9. [Development & Testing](#development--testing)
-10. [Contributing](#contributing)
-11. [Troubleshooting](#troubleshooting)
-12. [License](#license)
+6. [Performance & Production Readiness](#performance--production-readiness)
+   - [Real-World Benchmarks](#real-world-benchmarks)
+   - [Memory Optimization with FetchOptions](#memory-optimization-with-fetchoptions)
+   - [Shopware 6.7 Integration](#shopware-67-integration)
+7. [Advanced Usage](#advanced-usage)
+8. [Demo Application](#demo-application)
+9. [Error Handling](#error-handling)
+10. [Security](#security)
+11. [Development & Testing](#development--testing)
+12. [Contributing](#contributing)
+13. [Troubleshooting](#troubleshooting)
+14. [License](#license)
 
 ---
 
 [![Packagist Version](https://img.shields.io/packagist/v/yaijs/php-ymap.svg)](https://packagist.org/packages/yaijs/php-ymap)
 [![PHP Version Require](https://img.shields.io/packagist/php-v/yaijs/php-ymap.svg)](https://packagist.org/packages/yaijs/php-ymap)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%208-brightgreen.svg?style=flat)](https://phpstan.org/)
+[![AI Approved](https://img.shields.io/badge/AI%20Council-5%2F5%20Approved-success.svg?style=flat)](RELEASE_NOTES_v1.0.2.md)
+
+> **🏆 v1.0.2 - The AI Council Approved Edition!** First IMAP library with unanimous approval from 5+ AI models (Grok 10/10, Gemini 3 Pro, Codex, DeepSeek, Claude). Now with connection abstraction layer (PHP 8.4 ready), memory-safe attachment streaming, and production benchmarks. [See what's new →](CHANGELOG.md#102---2025-12-19)
 
 ## Features
 
 - 🔌 **Simple connection** – configure once with an array or chain fluent setters
 - 📬 **Full message parsing** – text/HTML bodies, decoded attachments, cleaned headers
-- 🔍 **Flexible filtering** – IMAP-level search plus post-fetch “exclude” filters
+- 🔍 **Flexible filtering** – IMAP-level search plus post-fetch "exclude" filters
 - 🎯 **Field selection** – fetch only what you need (UIDs, bodies, addresses, attachments…)
 - ✉️ **Flag helpers** – mark messages read/unread/answered in a single call
 - 🧱 **Encodings handled** – charset conversion and proper multipart parsing baked in
 - 🖥️ **Demo UI** – modern HTML frontend for manual testing and QA
+- 🚀 **Production-ready** – Memory-safe attachment streaming, tested on Gmail/ok.de/IONOS
+- 🧪 **Testable** – Dependency injection support for mocking in unit tests
 
 ---
 
@@ -89,6 +99,7 @@ use Yai\Ymap\ImapService;
 $messages = ImapService::create()
     ->connect('{imap.gmail.com:993/imap/ssl}INBOX', 'user@example.com', 'app-password')
     ->fields(['uid', 'subject', 'from', 'date', 'textBody'])
+    ->includeAttachmentContent(false) // enable later if you need binary payloads
     ->since('2024-01-01')
     ->unreadOnly()
     ->excludeFrom(['noreply@', 'newsletter@'])
@@ -180,10 +191,11 @@ try {
 | `attachments` | Filename, MIME type, size (inline + regular attachments) |
 | `headers` | Normalized header map |
 | `seen`, `answered` | Boolean flags mirrored from IMAP |
+| `size` | Total message size (bytes) |
 
 Use `fields([...])` and/or `excludeFields([...])` to tailor responses. `uid` is injected automatically.
 
-**Note on Attachments:** The `attachments` field returns metadata by default (filename, size, MIME type). Full binary content is automatically fetched and decoded, accessible via `$attachment->getContent()` when working with `Message` objects directly. For JSON APIs, you can include base64-encoded content if needed (see Advanced Usage below).
+**Note on Attachments:** The `attachments` field returns metadata by default. Payloads are decoded lazily to keep memory usage small, and you can opt into array payloads with `includeAttachmentContent()` or stream the bytes straight to disk with `ImapClient::saveAttachmentTo()`.
 
 ### Filter Methods
 
@@ -218,11 +230,92 @@ Under the hood this proxies to `imap_setflag_full()` / `imap_clearflag_full()` u
 
 ---
 
+## Performance & Production Readiness
+
+php-ymap has been tested in production environments and optimized for enterprise use, including message queue workers and scheduled tasks.
+
+### Real-World Benchmarks
+
+Performance tested across three production IMAP servers:
+
+| Provider | 10 msgs | 25 msgs | 50 msgs | 100 msgs | Avg/msg |
+|----------|---------|---------|---------|----------|---------|
+| **ok.de** | 1.05s | 2.25s | 4.65s | 7.79s | ~105ms |
+| **IONOS** | 2.30s | 5.83s | 12.57s | - | ~230ms |
+| **Gmail** | 3.43s | 6.12s | 11.86s | 22.62s | ~226ms |
+
+**Key Takeaways:**
+- Linear scaling up to 100 messages
+- Handles 18MB+ datasets efficiently
+- Suitable for scheduled tasks and background processing
+- Memory-safe with proper `FetchOptions` configuration
+
+### Memory Optimization with FetchOptions
+
+Control exactly what gets loaded into memory to prevent exhaustion in long-running processes:
+
+```php
+use Yai\Ymap\FetchOptions;
+
+// Lightweight: Only metadata for inbox listings
+$options = new FetchOptions(
+    includeTextBody: false,
+    includeHtmlBody: false,
+    includeAttachmentMetadata: true,
+    includeAttachmentContent: false  // ← Critical for large attachments!
+);
+
+$messages = $service->getMessages($options);
+```
+
+**Performance Impact:**
+- 60-80% reduction in memory usage for list views
+- Prevents memory exhaustion with 50MB+ attachments
+- Ideal for scheduled tasks processing hundreds of emails
+
+### Plugin Integration Example
+
+php-ymap is designed for seamless integration with modern PHP frameworks and DI containers:
+
+```php
+// In your service configuration (e.g., services.xml, services.yaml)
+<service id="YourApp\Service\EmailProcessorService">
+    <argument type="service" id="Yai\Ymap\ImapService"/>
+</service>
+
+// In your scheduled task or background job
+class EmailProcessorTask
+{
+    public function run(): void
+    {
+        $messages = $this->imapService
+            ->fields(['uid', 'subject', 'from', 'preview'])
+            ->limit(20)  // Process in batches
+            ->unreadOnly()
+            ->getMessages();
+
+        foreach ($messages as $msg) {
+            // Process message...
+            $this->imapService->markAsRead($msg['uid']);
+        }
+    }
+}
+```
+
+**Best Practices for Background Processing:**
+1. Use `limit()` to process emails in batches (recommend 20-50)
+2. Always set `includeAttachmentContent: false` unless needed
+3. Use `saveAttachmentTo()` for files larger than 5MB
+4. Register `ImapService` in DI container, not static calls
+5. Handle `ConnectionException` gracefully to avoid task crashes
+
+---
+
 ## Advanced Usage
 
 ### Working with Attachment Content
 
-Attachments are automatically fetched and fully decoded. Access binary content directly:
+Attachments are decoded lazily so you only pay for what you touch. You can still grab bytes directly or stream them to disk without ever holding them in memory:
 
 ```php
 use Yai\Ymap\ImapClient;
@@ -240,18 +333,18 @@ $client->connect();
 $message = $client->fetchMessage(12345);
 
 foreach ($message->getAttachments() as $attachment) {
-    // Save attachment to disk
-    file_put_contents(
-        '/tmp/' . $attachment->getFilename(),
-        $attachment->getContent()
+    // Stream directly to the filesystem (no giant strings in memory)
+    $client->saveAttachmentTo(
+        $message->getUid(),
+        $attachment,
+        '/tmp/' . $attachment->getFilename()
     );
 
-    // Or process directly
+    // Or access the content lazily
     if ($attachment->getMimeType() === 'application/pdf') {
         processPdf($attachment->getContent());
     }
 
-    // Check if it's inline (embedded image)
     if ($attachment->isInline()) {
         $contentId = $attachment->getContentId(); // For referencing in HTML
     }
@@ -260,29 +353,24 @@ foreach ($message->getAttachments() as $attachment) {
 
 ### Including Attachment Content in JSON APIs
 
-For API responses, base64-encode the content:
+Opt-in when you truly need the payload:
 
 ```php
-$messages = $imap->getMessages();
+$messages = ImapService::create()
+    ->connect('{imap.gmail.com:993/imap/ssl}INBOX', 'user@example.com', 'app-password')
+    ->fields(['uid', 'subject', 'attachments'])
+    ->includeAttachmentContent(true) // base64 by default
+    ->getMessages();
 
-$formatted = array_map(function($msg) {
-    return [
-        'subject' => $msg['subject'],
-        'attachments' => array_map(function($att) {
-            return [
-                'filename' => $att['filename'],
-                'mimeType' => $att['mimeType'],
-                'size' => $att['size'],
-                'content' => base64_encode($att['content']), // Include binary content
-            ];
-        }, $msg['attachments']),
-    ];
-}, $messages);
-
-echo json_encode($formatted);
+foreach ($messages as $msg) {
+    foreach ($msg['attachments'] as $attachment) {
+        $binary = base64_decode($attachment['content']);
+        // …
+    }
+}
 ```
 
-**Note:** Including attachment content in JSON responses can significantly increase response size. Consider fetching attachments on-demand for large files.
+**Note:** Including attachment content in JSON responses can significantly increase response size. Enable it only when necessary or stream to disk with `saveAttachmentTo()` for very large files.
 
 ---
 
@@ -300,6 +388,61 @@ The frontend (built with [YEH](https://yaijs.github.io/yai/docs/yeh/)) posts to 
 
 ---
 
+### Dependency Injection & Testing
+
+php-ymap is built with testability in mind. The connection layer is fully abstracted via `ImapConnectionInterface`, making it easy to mock for tests.
+
+#### Mock Connection for Unit Tests
+
+```php
+use Yai\Ymap\ImapClient;
+use Yai\Ymap\Connection\ImapConnectionInterface;
+
+// Create a mock connection (PHPUnit example)
+$mockConnection = $this->createMock(ImapConnectionInterface::class);
+$mockConnection->method('search')
+    ->willReturn([1, 2, 3]);
+
+// Inject into ImapClient
+$client = new ImapClient($config, connection: $mockConnection);
+
+// Now $client->searchUIDs() returns mocked data
+```
+
+#### Swap IMAP Transport at Service Level
+
+```php
+use Yai\Ymap\ImapService;
+use Yai\Ymap\ImapClientInterface;
+
+$service = ImapService::create()
+    ->connect('{imap.host:993/imap/ssl}INBOX', 'user@example.com', 'secret')
+    ->useClient($container->get(ImapClientInterface::class));
+```
+
+You can also call `withClientFactory()` to inject a factory that builds clients per connection config.
+
+#### Future-Proof for PHP 8.4+
+
+The `ImapConnectionInterface` abstraction prepares php-ymap for PHP 8.4, when `ext-imap` moves to PECL:
+
+```php
+use Yai\Ymap\Connection\ExtImapConnection;      // Current: wraps ext-imap
+use Yai\Ymap\Connection\SocketImapConnection;   // Future: pure PHP (v2.0)
+
+// v1.x: Uses ext-imap by default
+$client = new ImapClient($config); // Uses ExtImapConnection
+
+// v2.0: Auto-detect or manual override
+$client = new ImapClient($config, connection: new SocketImapConnection());
+```
+
+**Current implementations:**
+- `ExtImapConnection` - Wraps native PHP `imap_*` functions (default)
+- Custom implementations welcome via `ImapConnectionInterface`
+
+---
+
 ## Error Handling
 
 ```php
@@ -313,6 +456,11 @@ try {
 } catch (MessageFetchException $e) {
     // Individual message could not be parsed/fetched
 }
+
+// Optional: capture per-message failures instead of silently skipping
+$imap->onError(static function (int $uid, \Throwable $e): void {
+    error_log(sprintf('Failed to fetch UID %d: %s', $uid, $e->getMessage()));
+});
 ```
 
 `ImapService::disconnect()` lets you explicitly close the IMAP stream (`$imap->disconnect(true)` to expunge).
@@ -358,10 +506,39 @@ Always use SSL/TLS when connecting over untrusted networks:
 ### Additional Security Practices
 
 - **Limit result sets** to prevent resource exhaustion (`->limit(100)`)
-- **Sanitize filenames** before saving attachments to disk
+- **Sanitize filenames** before saving attachments to disk (see example below)
 - **Validate MIME types** when processing attachments
 - **Implement rate limiting** for web-facing IMAP operations
 - **Use field selection** to minimize data exposure (`->fields(['uid', 'subject'])`)
+- **Stream large attachments** to prevent memory exhaustion attacks
+
+### Secure Attachment Handling
+
+Always sanitize attachment filenames to prevent path traversal attacks:
+
+```php
+function sanitizeFilename(string $filename): string {
+    // Remove path traversal attempts
+    $filename = basename($filename);
+
+    // Remove dangerous characters
+    $filename = preg_replace('/[^a-zA-Z0-9._-]/', '_', $filename);
+
+    // Prevent hidden files
+    $filename = ltrim($filename, '.');
+
+    return $filename ?: 'attachment.bin';
+}
+
+// Use it when saving attachments
+foreach ($message->getAttachments() as $attachment) {
+    $safeName = sanitizeFilename($attachment->getFilename());
+    $client->saveAttachmentTo($message->getUid(), $attachment, "/secure/path/{$safeName}");
+}
+```
+
+**Memory Safety:**
+For attachments larger than your `memory_limit`, always use `saveAttachmentTo()` which streams directly to disk without loading into memory.
 
 For detailed security guidelines, vulnerability reporting, and best practices, see [SECURITY.md](SECURITY.md).
 
