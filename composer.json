@@ -6,7 +6,6 @@
     "minimum-stability": "stable",
     "require": {
         "php": "^8.1",
-        "ext-imap": "*",
         "ext-iconv": "*",
         "ext-json": "*",
         "ext-mbstring": "*"
@@ -20,5 +19,7 @@
             "Yai\\Ymap\\": "src/"
         }
     },
-    "suggest": {}
+    "suggest": {
+        "ext-imap": "Optional: enables native ext-imap connector fallback (ExtImapConnection)."
+    }
 }

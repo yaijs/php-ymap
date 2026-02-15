@@ -393,6 +393,11 @@ final class ImapService
                 }
 
                 continue;
+            } catch (\Throwable $e) {
+                if (null !== $this->errorHandler) {
+                    ($this->errorHandler)($uid, $e);
+                }
+                continue;
             }
         }
 

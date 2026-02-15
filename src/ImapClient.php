@@ -4,23 +4,13 @@ namespace Yai\Ymap;
 
 use DateTimeImmutable;
 use Exception;
+use Yai\Ymap\Connection\ConnectionLibrary\IMAP;
 use Yai\Ymap\Exceptions\ConnectionException;
 use Yai\Ymap\Exceptions\ImapException;
 use Yai\Ymap\Exceptions\MessageFetchException;
-use const ENC7BIT;
-use const ENC8BIT;
-use const ENCBASE64;
-use const ENCBINARY;
-use const ENCQUOTEDPRINTABLE;
-use const FT_PEEK;
-use const FT_UID;
-use const SE_UID;
 use const SORT_NUMERIC;
-use const ST_UID;
-use const TYPEMESSAGE;
-use const TYPEMULTIPART;
-use const TYPETEXT;
 use Yai\Ymap\Connection\ExtImapConnection;
+use Yai\Ymap\Connection\SocketsImapConnection;
 use Yai\Ymap\Connection\ImapConnectionInterface;
 use function array_filter;
 use function array_map;
@@ -67,7 +57,7 @@ final class ImapClient implements ImapClientInterface
     ) {
         $this->config = $config;
         $this->targetEncoding = $targetEncoding;
-        $this->connection = $connection ?? new ExtImapConnection();
+        $this->connection = $connection ?? new SocketsImapConnection();
     }
 
     public function __destruct()
@@ -128,7 +118,7 @@ final class ImapClient implements ImapClientInterface
     public function search(string $criteria = 'ALL'): array
     {
         $stream = $this->stream();
-        $result = $this->connection->search($stream, $criteria, SE_UID);
+        $result = $this->connection->search($stream, $criteria, IMAP::SE_UID);
         sort($result, SORT_NUMERIC);
 
         return $result;
@@ -152,7 +142,7 @@ final class ImapClient implements ImapClientInterface
     {
         $options ??= FetchOptions::everything();
         $stream = $this->stream();
-        $rawHeader = $this->connection->fetchHeader($stream, $uid, FT_UID);
+        $rawHeader = $this->connection->fetchHeader($stream, $uid, IMAP::FT_UID);
 
         if (false === $rawHeader) {
             throw new MessageFetchException(
@@ -193,14 +183,14 @@ final class ImapClient implements ImapClientInterface
             $message->addReplyTo($address);
         }
 
-        $structure = $this->connection->fetchStructure($stream, $uid, FT_UID);
+        $structure = $this->connection->fetchStructure($stream, $uid, IMAP::FT_UID);
         if (false === $structure) {
             throw new MessageFetchException(
                 sprintf('Unable to fetch structure for UID %d: %s', $uid, $this->collectLastError())
             );
         }
 
-        $overview = $this->connection->fetchOverview($stream, (string) $uid, FT_UID);
+        $overview = $this->connection->fetchOverview($stream, (string) $uid, IMAP::FT_UID);
         if (isset($overview[0])) {
             $message->setSeen(!empty($overview[0]->seen));
             $message->setAnswered(!empty($overview[0]->answered));
@@ -280,7 +270,7 @@ final class ImapClient implements ImapClientInterface
         }
 
         $stream = $this->stream();
-        if (false === $this->connection->setFlag($stream, $sequence, $flag, ST_UID)) {
+        if (false === $this->connection->setFlag($stream, $sequence, $flag, IMAP::ST_UID)) {
             throw new ImapException(
                 sprintf('Unable to set flag %s on %s: %s', $flag, $sequence, $this->collectLastError())
             );
@@ -301,7 +291,7 @@ final class ImapClient implements ImapClientInterface
         }
 
         $stream = $this->stream();
-        if (false === $this->connection->clearFlag($stream, $sequence, $flag, ST_UID)) {
+        if (false === $this->connection->clearFlag($stream, $sequence, $flag, IMAP::ST_UID)) {
             throw new ImapException(
                 sprintf('Unable to clear flag %s on %s: %s', $flag, $sequence, $this->collectLastError())
             );
@@ -324,7 +314,7 @@ final class ImapClient implements ImapClientInterface
         }
 
         $stream = $this->stream();
-        $result = $this->connection->saveBody($stream, $destination, $uid, $partNumber, FT_UID | FT_PEEK);
+        $result = $this->connection->saveBody($stream, $destination, $uid, $partNumber, IMAP::FT_UID | IMAP::FT_PEEK);
 
         if (false === $result) {
             throw new ImapException(
@@ -446,9 +436,9 @@ final class ImapClient implements ImapClientInterface
         $stream = $this->stream();
 
         if ($singlePartMessage && '1' === $partNumber) {
-            $body = $this->connection->body($stream, $uid, FT_UID | FT_PEEK);
+            $body = $this->connection->body($stream, $uid, IMAP::FT_UID | IMAP::FT_PEEK);
         } else {
-            $body = $this->connection->fetchBody($stream, $uid, $partNumber, FT_UID | FT_PEEK);
+            $body = $this->connection->fetchBody($stream, $uid, $partNumber, IMAP::FT_UID | IMAP::FT_PEEK);
         }
 
         if (false === $body || '' === $body) {
@@ -461,10 +451,10 @@ final class ImapClient implements ImapClientInterface
     private function decodeBody(string $body, int $encoding): string
     {
         return match ($encoding) {
-            ENCBASE64 => base64_decode($body, true) ?: '',
-            ENCQUOTEDPRINTABLE => quoted_printable_decode($body),
-            ENCBINARY => $body,
-            ENC8BIT, ENC7BIT => $body,
+            IMAP::ENCBASE64 => base64_decode($body, true) ?: '',
+            IMAP::ENCQUOTEDPRINTABLE => quoted_printable_decode($body),
+            IMAP::ENCBINARY => $body,
+            IMAP::ENC8BIT, IMAP::ENC7BIT => $body,
             default => $body,
         };
     }
@@ -519,7 +509,7 @@ final class ImapClient implements ImapClientInterface
 
     private function isTextPart(object $part, string $subtype): bool
     {
-        return TYPETEXT === ($part->type ?? null)
+        return IMAP::TYPETEXT === ($part->type ?? null)
             && strtoupper($subtype) === strtoupper((string) ($part->subtype ?? ''));
     }
 
@@ -547,8 +537,8 @@ final class ImapClient implements ImapClientInterface
     {
         $primaryTypeMap = [
             TYPETEXT => 'text',
-            TYPEMULTIPART => 'multipart',
-            TYPEMESSAGE => 'message',
+            IMAP::TYPEMULTIPART => 'multipart',
+            IMAP::TYPEMESSAGE => 'message',
             3 => 'application',
             4 => 'audio',
             5 => 'image',
@@ -715,7 +705,7 @@ final class ImapClient implements ImapClientInterface
         if ($options->shouldFetchAttachmentContent()) {
             $body = $this->fetchPartBody($uid, $partNumber, $isSinglePartMessage);
             if (null !== $body) {
-                $content = $this->decodeBody($body, (int) ($part->encoding ?? ENC7BIT));
+                $content = $this->decodeBody($body, (int) ($part->encoding ?? IMAP::ENC7BIT));
                 $size = strlen($content);
             } else {
                 $content = '';
@@ -728,7 +718,7 @@ final class ImapClient implements ImapClientInterface
                     return '';
                 }
 
-                return $this->decodeBody($body, (int) ($part->encoding ?? ENC7BIT));
+                return $this->decodeBody($body, (int) ($part->encoding ?? IMAP::ENC7BIT));
             };
         }
 

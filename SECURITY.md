@@ -47,16 +47,13 @@ If you discover a security vulnerability in php-ymap, please report it privately
 
 ### TLS/SSL Configuration
 
-php-ymap connects to IMAP servers using the native PHP IMAP extension. Ensure secure connections:
+php-ymap supports both the socket connector (default) and the optional native IMAP extension connector. In both cases, enforce TLS:
 
 ```php
 $config = new ConnectionConfig(
-    host: 'imap.example.com',
-    port: 993,              // Use SSL port
-    username: getenv('IMAP_USER'),
-    password: getenv('IMAP_PASS'),
-    flags: '/imap/ssl',     // Enable SSL
-    mailbox: 'INBOX'
+    '{imap.example.com:993/imap/ssl}INBOX',
+    getenv('IMAP_USER'),
+    getenv('IMAP_PASS')
 );
 ```
 
@@ -114,9 +111,9 @@ $messages = $service
 
 ## Known Security Considerations
 
-1. **IMAP Extension:** php-ymap depends on PHP's native IMAP extension which uses the c-client library. Keep PHP updated to receive security patches.
+1. **Connector Choice:** Socket mode is the default runtime path. If you enable `ext-imap`, keep PHP and extension packages updated.
 
-2. **Memory Usage:** Large attachments are loaded into memory. For production use with large attachments, consider implementing streaming (see TASK_LIST.md).
+2. **Memory Usage:** Large attachments can exhaust memory if fully materialized. Prefer metadata-only fetches and streaming for large files.
 
 3. **Connection Security:** Always use SSL/TLS for IMAP connections when connecting over untrusted networks.
 

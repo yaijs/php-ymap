@@ -42,6 +42,9 @@ use function trim;
  */
 final class ExtImapConnection implements ImapConnectionInterface
 {
+    /**
+     * @param array<string, mixed> $parameters
+     */
     public function open(
         string $mailbox,
         string $username,
@@ -71,6 +74,9 @@ final class ExtImapConnection implements ImapConnectionInterface
         return imap_ping($stream);
     }
 
+    /**
+     * @return array<int, int>
+     */
     public function search(mixed $stream, string $criteria, int $options = 0): array
     {
         $result = imap_search($stream, $criteria, $options);
@@ -78,6 +84,9 @@ final class ExtImapConnection implements ImapConnectionInterface
         return false === $result ? [] : $result;
     }
 
+    /**
+     * @return array<int, object>
+     */
     public function fetchOverview(mixed $stream, string $sequence, int $options = 0): array
     {
         $result = imap_fetch_overview($stream, $sequence, $options);
@@ -142,6 +151,9 @@ final class ExtImapConnection implements ImapConnectionInterface
         return imap_clearflag_full($stream, $sequence, $flag, $options);
     }
 
+    /**
+     * @return array<int, object>
+     */
     public function mimeHeaderDecode(string $text): array
     {
         $decoded = imap_mime_header_decode($text);
@@ -186,6 +198,9 @@ final class ExtImapConnection implements ImapConnectionInterface
         return imap_utf8($text);
     }
 
+    /**
+     * @return array<int, string>
+     */
     public function errors(): array
     {
         $errors = imap_errors() ?: [];

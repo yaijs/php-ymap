@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-02-15
+
+### Added
+- **Socket connector hardening for PHP 8.4+ migration**
+  - Stable default connector path without relying on `ext-imap`
+  - Improved low-level fetch handling for mixed server responses
+
+### Fixed
+- **Body parsing regression in socket mode**
+  - Fixed MIME body extraction when `BODY.PEEK[...]` responses are wrapped as nested arrays
+  - Restored `textBody`/`htmlBody` population for multipart messages that previously returned empty payloads
+- **Message flag persistence in demo/workflows**
+  - Ensured `seen` and `answered` states are loaded from message overview metadata and stay in sync after updates
+- **Search criteria reliability**
+  - Corrected quoted search token handling in socket searches for better provider compatibility
+
+### Changed
+- `ext-imap` is now optional at package level (`suggest`), not a hard Composer requirement
+- Documentation now reflects socket-first runtime with optional `ExtImapConnection` fallback
+- README benchmarks now document both connector modes (`ext-imap` reference vs default socket mode), including IONOS mailbox-size limits
+
+[1.0.3]: https://github.com/yaijs/php-ymap/releases/tag/v1.0.3
+
 ## [1.0.2] - 2025-12-19
 
 ### Added

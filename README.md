@@ -31,9 +31,9 @@ A lightweight fluent IMAP client for PHP 8.1+. Decode bodies, attachments, and h
 [![Packagist Version](https://img.shields.io/packagist/v/yaijs/php-ymap.svg)](https://packagist.org/packages/yaijs/php-ymap)
 [![PHP Version Require](https://img.shields.io/packagist/php-v/yaijs/php-ymap.svg)](https://packagist.org/packages/yaijs/php-ymap)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%208-brightgreen.svg?style=flat)](https://phpstan.org/)
-[![AI Approved](https://img.shields.io/badge/AI%20Council-5%2F5%20Approved-success.svg?style=flat)](RELEASE_NOTES_v1.0.2.md)
+[![AI Approved](https://img.shields.io/badge/AI%20Council-5%2F5%20Approved-success.svg?style=flat)](v1.0.3.md)
 
-> **🏆 v1.0.2 - The AI Council Approved Edition!** First IMAP library with unanimous approval from 5+ AI models (Grok 10/10, Gemini 3 Pro, Codex, DeepSeek, Claude). Now with connection abstraction layer (PHP 8.4 ready), memory-safe attachment streaming, and production benchmarks. [See what's new →](CHANGELOG.md#102---2025-12-19)
+> **🏆 v1.0.3 - Socket Mode Stabilized!** php-ymap now runs reliably without `ext-imap`, including restored multipart body parsing and persisted read/answered flags in real inbox workflows. [See what's new →](CHANGELOG.md#103---2026-02-15)
 
 ## Features
 
@@ -52,8 +52,9 @@ A lightweight fluent IMAP client for PHP 8.1+. Decode bodies, attachments, and h
 ## Requirements
 
 - PHP 8.1+
-- Extensions: IMAP, mbstring, iconv, JSON
-- Enable IMAP on Ubuntu/Debian: `sudo apt install php8.2-imap && sudo phpenmod imap`
+- Required extensions: mbstring, iconv, JSON
+- Optional extension: `ext-imap` (for explicit `ExtImapConnection` usage)
+- Default runtime connector: pure PHP sockets (`SocketsImapConnection`)
 
 ---
 
@@ -145,15 +146,15 @@ $messages = $imap->getMessages();
 
 ### Connection Options
 
-`ImapService::connect()` (and the `connection` config section) accept the same parameters that PHP’s `imap_open()` does:
+`ImapService::connect()` (and the `connection` config section) keep `imap_open()`-compatible parameters so existing configs continue to work in both connector modes:
 
 | Option | Description |
 |--------|-------------|
 | `mailbox` | IMAP path, e.g. `{imap.gmail.com:993/imap/ssl}INBOX` |
 | `username`, `password` | Credentials or app password |
-| `options` | Bitmask passed to `imap_open()` |
-| `retries` | Retry count for `imap_open()` |
-| `parameters` | Associative array passed to `imap_open()` (set TLS context, disable authenticators, etc.) |
+| `options` | `imap_open()` bitmask compatibility field |
+| `retries` | Retry count compatibility field |
+| `parameters` | Optional connector parameters (TLS/auth behavior where supported) |
 | `encoding` | Target encoding for decoded bodies (default `UTF-8`) |
 
 Need a lightweight “Test Credentials” button? Call the static helper:
@@ -236,16 +237,30 @@ php-ymap has been tested in production environments and optimized for enterprise
 
 ### Real-World Benchmarks
 
-Performance tested across three production IMAP servers:
+Performance tested across three production IMAP servers in both connector modes.
 
-| Provider | 10 msgs | 25 msgs | 50 msgs | 100 msgs | Avg/msg |
-|----------|---------|---------|---------|----------|---------|
-| **ok.de** | 1.05s | 2.25s | 4.65s | 7.79s | ~105ms |
-| **IONOS** | 2.30s | 5.83s | 12.57s | - | ~230ms |
-| **Gmail** | 3.43s | 6.12s | 11.86s | 22.62s | ~226ms |
+**ext-imap mode (reference):**
+
+| Provider  | 10 msgs | 25 msgs | 50 msgs | 100 msgs | Avg/msg |
+|-----------|---------|---------|---------|----------|---------|
+| **ok.de** |  1.05s  |  2.25s  |  4.65s  |   7.79s  | ~105ms  |
+| **IONOS** |  2.30s  |  5.83s  | 12.57s  |    -     | ~230ms  |
+| **Gmail** |  3.43s  |  6.12s  | 11.86s  |  22.62s  | ~226ms  |
+
+**Socket mode (default in v1.0.3):**
+
+| Provider  | 10 msgs | 25 msgs  | 50 msgs  | 100 msgs | Avg/msg |
+|-----------|---------|----------|----------|----------|---------|
+| **ok.de** | 1.4282s |  3.0770s |  5.8331s | 11.3149s | ~113ms  |
+| **IONOS** | 3.5413s |  5.8178s | 16.9986s |     -    | ~340ms  |
+| **Gmail** | 5.7557s | 13.0100s | 22.1389s | 37.4546s | ~375ms  |
+
+_Note: IONOS mailbox had 61 messages, so no 100-message run in either mode._
 
 **Key Takeaways:**
-- Linear scaling up to 100 messages
+- Socket mode remains stable without `ext-imap` across tested providers
+- Throughput is lower in socket mode (expected in pure PHP transport)
+- Linear scaling up to 100 messages where mailbox size allows it
 - Handles 18MB+ datasets efficiently
 - Suitable for scheduled tasks and background processing
 - Memory-safe with proper `FetchOptions` configuration
@@ -422,23 +437,24 @@ $service = ImapService::create()
 
 You can also call `withClientFactory()` to inject a factory that builds clients per connection config.
 
-#### Future-Proof for PHP 8.4+
+#### Connector Selection (PHP 8.4+ Ready)
 
-The `ImapConnectionInterface` abstraction prepares php-ymap for PHP 8.4, when `ext-imap` moves to PECL:
+The `ImapConnectionInterface` abstraction keeps php-ymap portable across environments with and without `ext-imap`:
 
 ```php
-use Yai\Ymap\Connection\ExtImapConnection;      // Current: wraps ext-imap
-use Yai\Ymap\Connection\SocketImapConnection;   // Future: pure PHP (v2.0)
+use Yai\Ymap\Connection\ExtImapConnection;      // Optional: wraps ext-imap
+use Yai\Ymap\Connection\SocketsImapConnection;  // Default: pure PHP socket connector
 
-// v1.x: Uses ext-imap by default
-$client = new ImapClient($config); // Uses ExtImapConnection
+// Default in v1.0.3+: socket connector
+$client = new ImapClient($config); // Uses SocketsImapConnection
 
-// v2.0: Auto-detect or manual override
-$client = new ImapClient($config, connection: new SocketImapConnection());
+// Optional override to native extension connector
+$client = new ImapClient($config, connection: new ExtImapConnection());
 ```
 
 **Current implementations:**
-- `ExtImapConnection` - Wraps native PHP `imap_*` functions (default)
+- `SocketsImapConnection` - Pure PHP socket implementation (default)
+- `ExtImapConnection` - Wraps native PHP `imap_*` functions (optional)
 - Custom implementations welcome via `ImapConnectionInterface`
 
 ---
@@ -573,14 +589,14 @@ For security vulnerabilities, please see our [Security Policy](SECURITY.md) inst
 
 | Issue | Hint |
 |-------|------|
-| “Can't connect to mailbox” | Double-check mailbox path, host firewall, and that the IMAP extension is enabled |
+| “Can't connect to mailbox” | Double-check mailbox path, host firewall, TLS flags, and credentials |
 | Gmail authentication fails | Use an [App Password](https://support.google.com/accounts/answer/185833); basic auth is blocked |
 | Empty `textBody` | Some emails are HTML-only – read `htmlBody` or strip tags yourself (see example app) |
 | Self-signed certs | Provide stream context via `parameters` (e.g. `['DISABLE_AUTHENTICATOR' => 'PLAIN']`, or TLS context) |
-| Extension missing | `sudo apt install php8.2-imap && sudo phpenmod imap` |
+| Need ext-imap anyway | `sudo apt install php8.2-imap && sudo phpenmod imap` (optional, not required for default socket mode) |
 
 ---
 
 ## License
 
-MIT
+MIT. Portions of the IMAP protocol implementation and message helpers are derived from the MIT-licensed `Webklex/php-imap` and `ddeboer/imap` projects; see `THIRD_PARTY_LICENSES.md` for the preserved upstream notices you must include when redistributing this library or products that bundle it.

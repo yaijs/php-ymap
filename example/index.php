@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Live demo of php-ymap - a modern PHP 8.1+ IMAP library. Connect to any IMAP server, search/filter emails, manage message flags, and preview attachments with this lightweight, AJAX-powered interface.">
     <title>php-ymap Demo - Modern PHP IMAP Library</title>
+    <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=">
     <style>
         :root {
             --bg: #0f172a;
@@ -119,6 +120,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             background-clip: text;
         }
 
+        header a {
+            border: 0 none;
+        }
+
         header .subtitle {
             color: var(--muted);
             margin-bottom: 2rem;
@@ -138,20 +143,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             padding: 1rem 0;
             display: flex;
             justify-content: center;
+            gap: 1rem;
         }
 
         footer nav a {
             display: block;
-            padding: 0 15px;
+            padding: 4px 10px;
             color: var(--text);
-        }
-
-        footer nav a:not(:last-of-type) {
-            box-shadow: 1px 0 0px 0px #7d88f826;
         }
 
         .table-container {
             overflow-x: auto;
+        }
+
+        ul li {
+            padding: .1rem;
         }
 
         table {
@@ -350,6 +356,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             left: 100%;
         }
 
+        a {
+            line-height: 1.4;
+            display: inline-block;
+            border-bottom: 1px dashed;
+            text-decoration: none;
+            color: #92bbcb;
+        }
+        a:focus,
+        a:hover,
+        a:active {
+            color: #8ccbff;
+            border-bottom-style: solid;
+        }
+
         .password-wrapper {
             position: relative;
         }
@@ -473,10 +493,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .message-header {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
+            align-items: center;
+            gap: 1rem;
             margin-bottom: 1rem;
             padding-bottom: 1rem;
             border-bottom: 1px solid var(--border);
+        }
+
+        .message-header > div:first-of-type {
+            overflow: hidden;
+        }
+
+        .message-header > div:first-of-type .message-subject.collapsed {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .message-subject {
@@ -489,8 +520,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         .message-subject::before {
             content: '▼';
-            display: inline-block;
             margin-right: 0.5rem;
+            height: 12px;
+            display: inline-block;
             font-size: 0.7rem;
             transition: transform 0.2s;
         }
@@ -509,7 +541,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             white-space: nowrap;
             border-right: 1px solid #9b9191;
         }
-        .message-size { font-weight: 600; }
+        .message-size { font-weight: 600; white-space: nowrap; }
 
         .message-status-group {
             display: flex;
@@ -604,6 +636,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         .message-meta {
             display: flex;
+            align-items: center;
             font-size: 0.875rem;
             color: var(--muted);
         }
@@ -1018,6 +1051,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             overflow: hidden;
         }
 
+        .yeh b,
+        .yeh strong {
+            display: inline-block;
+            font-size: .9rem;
+        }
+        .yeh strong {
+            margin-top: .2rem;
+            padding-top: .2rem;
+            border-top: 1px solid #21497b;
+        }
+        .hidden-yeh {
+            display: none;
+        }
+
         @keyframes spin { to { transform: rotate(360deg); } }
 
         @keyframes pulse-border {
@@ -1034,7 +1081,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
     <header>
         <h1><a href="./">📬 php-ymap Demo</a></h1>
-        <p class="subtitle">A lightweight IMAP library for PHP 8.1+</p>
+        <div class="subtitle">
+            <div style="display:flex;justify-content:space-between;width:100%;">
+                <span>A lightweight IMAP library for PHP 8.1+</span>
+                <span style="font-size:14px;">
+                    <?= extension_loaded('imap')
+                        ? '<span style="color:#fa8933;cursor:help" title="The php-imap extension is deprecated and removed as of PHP 8.4.">ext-imap on</span>'
+                        : '<span style="color:#30dd70;cursor:help" title="Native socket mode">ext-imap off</span>' ?>
+                </span>
+            </div>
+        </div>
     </header>
     <main class="container" id="app">
         <div class="card connection">
@@ -1044,7 +1100,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="form-groups">
                     <div class="form-group">
                         <label for="mailbox">Mailbox Path</label>
-
                         <div class="form-groups">
                             <input type="text" id="mailbox" name="mailbox"
                                 value="{imap.gmail.com:993/imap/ssl}INBOX"
@@ -1315,15 +1370,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <span>Connecting and fetching messages...</span>
         </div>
 
-        <!-- Usage notes -->
+        <!-- Notes -->
         <div class="card">
+            <!-- Usage notes -->
             <h3>Usage Notes</h3>
             <ul style="color: var(--muted); padding-top: 0.5rem; padding-left: 1.25rem;">
-                <li>For Gmail, use an <strong>App Password</strong> (not your regular password)</li>
+                <li>Gmail requires an <a href="https://support.google.com/accounts/answer/185833?hl=en&ref_topic=7189145&sjid=961884463217736990-NA" target="_blank" rel="noopener"><strong>App Password</strong></a> for IMAP access</li>
                 <li>Enable IMAP in your email settings</li>
                 <li>This demo uses <code>FT_PEEK</code> so messages won't be marked as read</li>
-                <li>Click on email addresses to open a new draft via mailto</li>
                 <li>Click message subjects to expand/collapse the body</li>
+            </ul>
+            <hr />
+            <!-- Technical notes -->
+            <h3>Technical Notes</h3>
+            <ul style="color: var(--muted); padding-top: 0.5rem; padding-left: 1.25rem;">
+                <li>Default connector: <code>SocketsImapConnection</code> (works without <code>ext-imap</code>)</li>
+                <li><code>ext-imap</code> is optional and can be enabled as fallback</li>
+                <li><code>htmlBody</code> is only set when a valid <code>text/html</code> MIME part exists</li>
+                <li><code>bodyPreview</code>/<code>bodyFull</code> may include raw multipart content for non-standard emails</li>
+                <li>Flags (<code>seen</code>, <code>answered</code>) are loaded from server state and persisted via IMAP flag updates</li>
             </ul>
         </div>
 
@@ -1334,12 +1399,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 This demo uses <strong>YEH</strong> (Yai Event Hub) - a lightweight event delegation library for modern web apps.
             </p>
             <ul style="color: var(--muted); padding-left: 1.25rem; margin-bottom: 0.75rem;">
-                <li><a href="https://jsfiddle.net/hb9t3gam/" target="_blank" rel="noopener" style="color: #a78bfa;">YEH on JSF</a> — YEH toggleTarget Examples on Jsfiddle</li>
-                <li><a href="https://yaijs.github.io/yai/tabs/Example.html" target="_blank" rel="noopener" style="color: #a78bfa;">YaiTabs Live Demo</a> — Advanced tab system built on YEH</li>
-                <li><a href="https://yaijs.github.io/yai/docs/yeh/" target="_blank" rel="noopener" style="color: #a78bfa;">YEH Documentation</a> — Event delegation made simple</li>
+                <li><a href="https://jsfiddle.net/hb9t3gam/" target="_blank" rel="noopener">YEH on JSF</a> — YEH toggleTarget Examples on Jsfiddle</li>
+                <li><a href="https://yaijs.github.io/yai/tabs/Example.html" target="_blank" rel="noopener">YaiTabs Live Demo</a> — Advanced tab system built on YEH</li>
+                <li><a href="https://yaijs.github.io/yai/docs/yeh/" target="_blank" rel="noopener">YEH Documentation</a> — Event delegation made simple</li>
             </ul>
             <hr />
-            <pre>super({<br>  '#app':   ['click', 'input', 'submit'],<br>  'window': ['scroll']<br>})</pre>
+            <button type="button"
+                data-action="toggleTarget"
+                data-target=".basic-yeh"
+                data-toggle-class="hidden-yeh"
+                data-toggle-class-self="hidden-yeh"
+                data-toggle-state="inactive"
+                class="action-btn">
+                Show me the YEH
+            </button>
+            <div class="basic-yeh hidden-yeh">
+                <code>&lt;script type="module"&gt;</code>
+                <div style="padding:.75rem 0rem">
+                    <pre class="yeh" style="margin-bottom:.5rem">import <b>{ YEH }</b> from '<a href="https://cdn.jsdelivr.net/npm/@yaijs/core@1.1.4/yeh/yeh.min.js" target="_blank" rel="noopener"><b>https://cdn.jsdelivr.net/npm/@yaijs/core@1.1.4/yeh/yeh.min.js</b></a>';</pre>
+                    <hr />
+                    <pre class="yeh">new class extends YEH<br>{<br>    constructor() {<br/>        super({<br>            <b>'#app':   ['click', 'input', 'submit']</b>,<br>            <strong>'window': [{ type: 'scroll', throttle: 240 }]</strong><br/>        })<br/>    }</pre>
+                    <hr style="margin-left:2rem"/>
+                    <pre class="yeh">    handleClick( <b>e, t, c</b> ) { alert('Say what?') }<br>    handleInput() {}<br>    handleSubmit() {}<br>    handleScroll() {}<br>}()</pre>
+                </div>
+                <code>&lt;/script&gt;</code>
+            </div>
         </div>
 
         <!-- Scroll to top -->
@@ -1373,7 +1457,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'window': [{ type: 'scroll', throttle: 240 }],
                 }, {}, {
                     autoTargetResolution: true,
-                });
+                })
                 this.storageKey = 'phpYmapCredentials';
                 this.messageCache = new Map();
                 this.messageList = [];
