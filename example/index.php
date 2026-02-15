@@ -9,6 +9,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
+$phpVersion = PHP_VERSION;
+$imapLoaded = extension_loaded('imap');
+
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1085,7 +1088,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div style="display:flex;justify-content:space-between;width:100%;">
                 <span>A lightweight IMAP library for PHP 8.1+</span>
                 <span style="font-size:14px;">
-                    <?= extension_loaded('imap')
+                    <span style="color:var(--muted);margin-right:.65rem;font-size:12px;" title="Runtime PHP version">PHP <?= htmlspecialchars($phpVersion, ENT_QUOTES, 'UTF-8') ?></span>
+                    <?= $imapLoaded
                         ? '<span style="color:#fa8933;cursor:help" title="The php-imap extension is deprecated and removed as of PHP 8.4.">ext-imap on</span>'
                         : '<span style="color:#30dd70;cursor:help" title="Native socket mode">ext-imap off</span>' ?>
                 </span>
