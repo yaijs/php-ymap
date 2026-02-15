@@ -787,7 +787,7 @@ $imapLoaded = extension_loaded('imap');
             border-radius: 12px;
             padding: 1rem 2rem;
             color: var(--muted);
-            z-index: 1000;
+            z-index: 1001;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         }
 
@@ -831,7 +831,7 @@ $imapLoaded = extension_loaded('imap');
             display: none;
             align-items: center;
             justify-content: center;
-            z-index: 1500;
+            z-index: 1000;
         }
 
         .modal.show {
@@ -858,7 +858,7 @@ $imapLoaded = extension_loaded('imap');
         .modal-content {
             width: 100%;
             max-width: calc(940px - 10rem);
-            max-height: 85vh;
+            max-height: 80vh;
             position: relative;
             z-index: 2;
             display: flex;
@@ -1335,16 +1335,16 @@ $imapLoaded = extension_loaded('imap');
                 <h2 style="font-size: 1.25rem;">Messages</h2>
                 <div style="display: flex; align-items: center; gap: 1rem;">
                     <span id="totalSizeDisplay" style="font-size: 0.9rem; color: var(--muted);"></span>
-
-                    <button type="button"
-                        class="action-btn"
-                        data-action="toggleMessages"
-                        data-state="collapsed">
-                        Expand All
-                    </button>
                 </div>
             </div>
             <div id="messagesList"></div>
+            <button type="button"
+                class="action-btn secondary"
+                id="loadMoreBtn"
+                data-action="loadMore"
+                style="display:none; width:100%; padding: 22px; margin-bottom:1rem;">
+                Load More
+            </button>
         </div>
 
         <div class="modal" id="messageModal">
@@ -1469,6 +1469,9 @@ $imapLoaded = extension_loaded('imap');
                 this.defaultBodyLength = 5000;
                 this.lastFetchDuration = null;
                 this.isModalTransitioning = false;
+                this.canLoadMore = false;
+                this.nextBeforeUid = null;
+                this.isLoadingMore = false;
                 this.init();
             }
 
@@ -1536,7 +1539,11 @@ $imapLoaded = extension_loaded('imap');
                             `✓ Connected! Found ${data.count} of ${data.totalFound} message(s).`,
                             data.searchCriteria !== 'ALL' ? data.searchCriteria : null
                         );
-                        this.renderMessages(data.messages);
+                        this.renderMessages(data.messages, {
+                            append: false,
+                            hasMore: Boolean(data.hasMore),
+                            nextBeforeUid: data.nextBeforeUid ?? null,
+                        });
                     } else {
                         this.lastFetchDuration = null;
                         this.showStatus('error', data.error);
@@ -1562,34 +1569,137 @@ $imapLoaded = extension_loaded('imap');
                 `;
             }
 
-            renderMessages(messages) {
+            renderMessages(messages, options = {}) {
+                const append = Boolean(options.append);
+                const hasMore = Boolean(options.hasMore);
+                const nextBeforeUid = options.nextBeforeUid ?? null;
                 const container = document.getElementById('messagesContainer');
                 const list = document.getElementById('messagesList');
                 const totalSizeDisplay = document.getElementById('totalSizeDisplay');
-                this.messageCache = new Map();
-                this.messageList = [];
+                if (!append) {
+                    this.messageCache = new Map();
+                    this.messageList = [];
+                }
 
-                let totalSize = 0;
                 messages.forEach(msg => {
-                    this.messageCache.set(String(msg.uid), msg);
-                    this.messageList.push(String(msg.uid));
-                    totalSize += msg.size || 0;
+                    msg.detailsLoaded = Boolean(msg.detailsLoaded);
+                    const uid = String(msg.uid);
+                    const known = this.messageCache.has(uid);
+                    this.messageCache.set(uid, msg);
+                    if (!known) {
+                        this.messageList.push(uid);
+                    }
                 });
 
-                totalSizeDisplay.textContent = this.formatTotalSummary(totalSize, messages.length);
+                let totalSize = 0;
+                this.messageList.forEach(uid => {
+                    const cached = this.messageCache.get(uid);
+                    totalSize += cached?.size || 0;
+                });
+
+                totalSizeDisplay.textContent = this.formatTotalSummary(totalSize, this.messageList.length);
                 container.style.display = 'block';
-                if (messages.length === 0) {
+                if (!append && messages.length === 0) {
                     list.innerHTML = `
                         <div class="card empty-state">
                             <p>No messages found matching your criteria.</p>
                         </div>
                     `;
+                    this.updateLoadMoreState(false, null);
                     this.setMassToggleButtonState('collapsed');
                     return;
                 }
 
-                list.innerHTML = messages.map(msg => this.renderMessage(msg)).join('');
-                this.setMassToggleButtonState('collapsed');
+                const rendered = messages.map(msg => this.renderMessage(msg)).join('');
+                if (append) {
+                    list.insertAdjacentHTML('beforeend', rendered);
+                } else {
+                    list.innerHTML = rendered;
+                    this.setMassToggleButtonState('collapsed');
+                }
+
+                this.updateLoadMoreState(hasMore, nextBeforeUid);
+            }
+
+            updateLoadMoreState(canLoadMore, nextBeforeUid) {
+                this.canLoadMore = canLoadMore;
+                this.nextBeforeUid = Number.isFinite(Number(nextBeforeUid)) ? Number(nextBeforeUid) : null;
+
+                const button = document.getElementById('loadMoreBtn');
+                if (!button) {
+                    return;
+                }
+
+                if (!this.canLoadMore || !this.nextBeforeUid) {
+                    button.style.display = 'none';
+                    return;
+                }
+
+                button.style.display = '';
+                button.disabled = false;
+                button.textContent = 'Load More';
+            }
+
+            async loadMore(target) {
+                if (this.isLoadingMore) {
+                    return;
+                }
+                if (!this.canLoadMore || !this.nextBeforeUid) {
+                    this.showToast('No more messages to load', true);
+                    return;
+                }
+
+                const form = document.getElementById('imapForm');
+                const payload = new FormData(form);
+                payload.set('before_uid', String(this.nextBeforeUid));
+
+                const loading = document.getElementById('loading');
+                const loadingText = document.querySelector('#loading span');
+                const previousText = loadingText ? loadingText.textContent : null;
+
+                this.isLoadingMore = true;
+                target.disabled = true;
+                target.textContent = 'Loading...';
+                loading.classList.add('active', 'loading--inline');
+                document.body.classList.add('imap-loading');
+                if (loadingText) {
+                    loadingText.textContent = 'Loading older messages...';
+                }
+
+                try {
+                    const response = await fetch(window.location.pathname, {
+                        method: 'POST',
+                        body: payload,
+                    });
+                    const data = await response.json();
+
+                    if (!data.success) {
+                        throw new Error(data.error || 'Failed to load more messages');
+                    }
+
+                    this.renderMessages(data.messages || [], {
+                        append: true,
+                        hasMore: Boolean(data.hasMore),
+                        nextBeforeUid: data.nextBeforeUid ?? null,
+                    });
+
+                    if (!Array.isArray(data.messages) || data.messages.length === 0) {
+                        this.showToast('No more messages found');
+                    }
+                } catch (error) {
+                    this.showToast(error.message || 'Failed to load more messages', true);
+                } finally {
+                    this.isLoadingMore = false;
+                    loading.classList.remove('active', 'loading--inline');
+                    document.body.classList.remove('imap-loading');
+                    if (loadingText && null !== previousText) {
+                        loadingText.textContent = previousText;
+                    }
+                    if (this.canLoadMore) {
+                        target.disabled = false;
+                        target.textContent = 'Load More';
+                    }
+                }
             }
 
             renderMessage(msg) {
@@ -1745,11 +1855,34 @@ $imapLoaded = extension_loaded('imap');
                 return fixed.length < 7 ? fixed.padStart(7, '0') : fixed;
             }
 
-            // Toggle message body
-            toggleBody(target) {
-                const message = target.closest('.message');
-                const messageBody = message?.querySelector('.message-body');
+            // Toggle message body (lazy-load details on first expand)
+            async toggleBody(target) {
+                let message = target.closest('.message');
+                if (!message) {
+                    return;
+                }
 
+                const uid = String(message.dataset.uid || '');
+                const wantsExpand = target.classList.contains('collapsed');
+
+                if (wantsExpand) {
+                    const detailsLoaded = await this.ensureMessageDetails(uid);
+                    if (!detailsLoaded) {
+                        return;
+                    }
+
+                    message = document.querySelector(`.message[data-uid="${uid}"]`);
+                    if (!message) {
+                        return;
+                    }
+
+                    target = message.querySelector('.message-subject');
+                    if (!target) {
+                        return;
+                    }
+                }
+
+                const messageBody = message.querySelector('.message-body');
                 if (messageBody) {
                     messageBody.classList.toggle('collapsed');
                     target.classList.toggle('collapsed');
@@ -1773,7 +1906,7 @@ $imapLoaded = extension_loaded('imap');
                 this.setMassToggleButtonState(nextState, target);
             }
 
-            openModal(target) {
+            async openModal(target) {
                 const uid = target.dataset.uid;
 
                 if (!uid || !this.messageCache.has(uid)) {
@@ -1781,7 +1914,71 @@ $imapLoaded = extension_loaded('imap');
                     return;
                 }
 
+                const detailsLoaded = await this.ensureMessageDetails(uid);
+                if (!detailsLoaded) {
+                    return;
+                }
+
                 this.showMessageInModal(uid);
+            }
+
+            async ensureMessageDetails(uid) {
+                const cached = this.messageCache.get(uid);
+                if (!cached) {
+                    this.showToast('Message not available', true);
+                    return false;
+                }
+
+                if (cached.detailsLoaded) {
+                    return true;
+                }
+
+                const form = document.getElementById('imapForm');
+                const payload = new FormData(form);
+                const loading = document.getElementById('loading');
+                const loadingText = document.querySelector('#loading span');
+                const previousText = loadingText ? loadingText.textContent : null;
+
+                loading.classList.add('active', 'loading--inline');
+                document.body.classList.add('imap-loading');
+                if (loadingText) {
+                    loadingText.textContent = 'Loading message details...';
+                }
+
+                try {
+                    const response = await fetch(`${window.location.pathname}?message=${encodeURIComponent(uid)}&details=1`, {
+                        method: 'POST',
+                        body: payload,
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Failed to load message details');
+                    }
+
+                    const data = await response.json();
+                    if (!data.success || !data.message) {
+                        throw new Error(data.error || 'Failed to load message details');
+                    }
+
+                    data.message.detailsLoaded = true;
+                    this.messageCache.set(uid, data.message);
+
+                    const card = document.querySelector(`.message[data-uid="${uid}"]`);
+                    if (card) {
+                        card.outerHTML = this.renderMessage(data.message);
+                    }
+
+                    return true;
+                } catch (error) {
+                    this.showToast(error.message || 'Failed to load message details', true);
+                    return false;
+                } finally {
+                    loading.classList.remove('active', 'loading--inline');
+                    document.body.classList.remove('imap-loading');
+                    if (loadingText && null !== previousText) {
+                        loadingText.textContent = previousText;
+                    }
+                }
             }
 
             showMessageInModal(uid, skipEntranceAnimation = false) {
@@ -1810,8 +2007,7 @@ $imapLoaded = extension_loaded('imap');
                     <div><strong>UID:</strong> ${this.escapeHtml(String(msg.uid))}</div>
                 `;
 
-                const bodyText = msg.bodyFull || (msg.htmlBody ? this.escapeHtml(msg.htmlBody) : '');
-
+                const bodyText = msg.bodyFull || msg.bodyPreview || '';
                 bodyEl.textContent = bodyText || '(No body content available)';
 
                 // Update navigation button states
@@ -1841,6 +2037,10 @@ $imapLoaded = extension_loaded('imap');
 
                 const modal = document.getElementById('messageModal');
                 const inner = modal?.querySelector('.modal-content-inner');
+                const detailsLoaded = await this.ensureMessageDetails(uid);
+                if (!detailsLoaded) {
+                    return;
+                }
 
                 if (!inner) {
                     this.showMessageInModal(uid, true);
@@ -1886,17 +2086,17 @@ $imapLoaded = extension_loaded('imap');
                 }
             }
 
-            openPreviousMessage() {
+            async openPreviousMessage() {
                 if (this.currentModalMessageIndex > 0) {
                     const prevUid = this.messageList[this.currentModalMessageIndex - 1];
-                    this.animateModalSwap('prev', prevUid);
+                    await this.animateModalSwap('prev', prevUid);
                 }
             }
 
-            openNextMessage() {
+            async openNextMessage() {
                 if (this.currentModalMessageIndex < this.messageList.length - 1) {
                     const nextUid = this.messageList[this.currentModalMessageIndex + 1];
-                    this.animateModalSwap('next', nextUid);
+                    await this.animateModalSwap('next', nextUid);
                 }
             }
 
@@ -1957,11 +2157,29 @@ $imapLoaded = extension_loaded('imap');
                         throw new Error(data.error || 'Unable to update message');
                     }
 
-                    this.messageCache.set(String(uid), data.message);
+                    const cacheKey = String(uid);
+                    const current = this.messageCache.get(cacheKey) || {};
+                    let merged = { ...current, ...data.message };
+
+                    if (current.detailsLoaded && !data.message.detailsLoaded) {
+                        merged = {
+                            ...merged,
+                            bodyPreview: current.bodyPreview,
+                            bodyFull: current.bodyFull,
+                            bodyTruncated: current.bodyTruncated,
+                            htmlBody: current.htmlBody,
+                            attachments: current.attachments,
+                            detailsLoaded: true,
+                        };
+                    } else {
+                        merged.detailsLoaded = Boolean(merged.detailsLoaded);
+                    }
+
+                    this.messageCache.set(cacheKey, merged);
 
                     const card = document.querySelector(`.message[data-uid="${uid}"]`);
                     if (card) {
-                        card.outerHTML = this.renderMessage(data.message);
+                        card.outerHTML = this.renderMessage(merged);
                     }
 
                     const labels = {

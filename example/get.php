@@ -24,6 +24,11 @@ if (null !== $messageUid && $messageUid <= 0) {
     $messageUid = null;
 }
 $messageAction = $_GET['action'] ?? null;
+$messageDetails = isset($_GET['details']) && '1' === (string) $_GET['details'];
+$beforeUid = isset($_POST['before_uid']) ? (int) $_POST['before_uid'] : null;
+if (null !== $beforeUid && $beforeUid <= 0) {
+    $beforeUid = null;
+}
 
 $bodyLength = (int) ($_POST['body_length'] ?? 500);
 if ($bodyLength < 100) {
@@ -47,23 +52,39 @@ try {
             $_POST['mailbox'] ?: '{imap.gmail.com:993/imap/ssl}INBOX',
             $username,
             $password
-        )
-        ->fields([
-            'uid',
-            'subject',
-            'from',
-            'to',
-            'cc',
-            'replyTo',
-            'date',
-            'textBody',
-            'htmlBody',
-            'attachments',
-            'seen',
-            'answered',
-            'size',
-            'preview',
-        ])
+        );
+
+    $listFields = [
+        'uid',
+        'subject',
+        'from',
+        'to',
+        'cc',
+        'replyTo',
+        'date',
+        'seen',
+        'answered',
+        'size',
+    ];
+
+    $detailFields = [
+        'uid',
+        'subject',
+        'from',
+        'to',
+        'cc',
+        'replyTo',
+        'date',
+        'textBody',
+        'htmlBody',
+        'attachments',
+        'seen',
+        'answered',
+        'size',
+    ];
+
+    $imap
+        ->fields($messageDetails ? $detailFields : $listFields)
         ->limit((int) ($_POST['limit'] ?? 10))
         ->orderBy('desc');
 
@@ -137,10 +158,17 @@ try {
     };
 
     $formatMessage = static function (array $msg) use ($bodyLength, $mapAddresses) {
-        // Use the built-in preview which handles text/HTML fallback and whitespace
-        $body = $msg['preview'] ?? '';
-        $bodyPreview = mb_substr($body, 0, $bodyLength);
-        $isTruncated = mb_strlen($body) > $bodyLength;
+        $textBody = trim((string) ($msg['textBody'] ?? ''));
+        $htmlBody = isset($msg['htmlBody']) ? (string) $msg['htmlBody'] : null;
+        $body = $textBody;
+
+        if ('' === $body && null !== $htmlBody && '' !== $htmlBody) {
+            $body = trim(strip_tags($htmlBody));
+        }
+
+        $bodyPreview = '' !== $body ? mb_substr($body, 0, $bodyLength) : '';
+        $isTruncated = '' !== $body && mb_strlen($body) > $bodyLength;
+        $hasDetails = array_key_exists('textBody', $msg) || array_key_exists('htmlBody', $msg);
 
         $size = (int) ($msg['size'] ?? 0);
         if ($size >= 1048576) {
@@ -164,7 +192,8 @@ try {
             'bodyPreview' => $bodyPreview,
             'bodyFull' => $body,
             'bodyTruncated' => $isTruncated,
-            'htmlBody' => $msg['htmlBody'] ?? null,
+            'htmlBody' => $htmlBody,
+            'detailsLoaded' => $hasDetails,
             'seen' => (bool) ($msg['seen'] ?? false),
             'answered' => (bool) ($msg['answered'] ?? false),
             'size' => $size,
@@ -210,19 +239,40 @@ try {
         exit;
     }
 
-    $messages = $imap->getMessages();
+    $listOverrides = [];
+    if (null !== $beforeUid) {
+        $listOverrides['before_uid'] = $beforeUid;
+    }
+
+    $messages = $imap->getMessages($listOverrides);
 
     // Format for frontend
     $output = array_map($formatMessage, $messages);
 
-    // Get total count matching criteria (without limit)
-    $totalFound = $imap->getTotalCount($imap->getConfig()->toImapCriteria());
+    // Get counts for UI and pagination
+    $baseCriteria = $imap->getConfig()->toImapCriteria();
+    $effectiveConfig = [] !== $listOverrides ? $imap->getConfig()->merge($listOverrides) : $imap->getConfig();
+    $pagedCriteria = $effectiveConfig->toImapCriteria();
+    $totalFound = $imap->getTotalCount($baseCriteria);
+    $remainingForCursor = $imap->getTotalCount($pagedCriteria);
+    $hasMore = $remainingForCursor > count($output);
+    $nextBeforeUid = null;
+    if ([] !== $output) {
+        $uids = array_column($output, 'uid');
+        $lowestUid = (int) min($uids);
+        if ($lowestUid > 1) {
+            $nextBeforeUid = $lowestUid - 1;
+        }
+    }
 
     echo json_encode([
         'success' => true,
         'count' => count($output),
         'totalFound' => $totalFound,
-        'searchCriteria' => $imap->getConfig()->toImapCriteria(),
+        'remainingForCursor' => $remainingForCursor,
+        'hasMore' => $hasMore,
+        'nextBeforeUid' => $nextBeforeUid,
+        'searchCriteria' => $baseCriteria,
         'messages' => $output,
     ], JSON_INVALID_UTF8_SUBSTITUTE);
 

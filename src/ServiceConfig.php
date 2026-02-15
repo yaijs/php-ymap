@@ -51,6 +51,7 @@ final class ServiceConfig
     public ?string $subjectContains = null;
     public ?string $bodyContains = null;
     public ?bool $answered = null;
+    public ?int $beforeUid = null;
 
     // Exclusions (Post-fetch filtering)
     /** @var string[] */
@@ -147,6 +148,10 @@ final class ServiceConfig
             $instance->to = $filters['to'] ?? null;
             $instance->subjectContains = $filters['subject_contains'] ?? null;
             $instance->bodyContains = $filters['body_contains'] ?? null;
+            if (isset($filters['before_uid'])) {
+                $beforeUid = (int) $filters['before_uid'];
+                $instance->beforeUid = $beforeUid > 0 ? $beforeUid : null;
+            }
         }
 
         // Exclusions
@@ -202,6 +207,10 @@ final class ServiceConfig
         }
         if (isset($overrides['body_contains'])) {
             $clone->bodyContains = $overrides['body_contains'];
+        }
+        if (isset($overrides['before_uid'])) {
+            $beforeUid = (int) $overrides['before_uid'];
+            $clone->beforeUid = $beforeUid > 0 ? $beforeUid : null;
         }
 
         // Field overrides
@@ -309,6 +318,10 @@ final class ServiceConfig
 
         if (null !== $this->bodyContains && '' !== $this->bodyContains) {
             $criteria[] = 'BODY "' . addslashes($this->bodyContains) . '"';
+        }
+
+        if (null !== $this->beforeUid && $this->beforeUid > 0) {
+            $criteria[] = 'UID 1:' . $this->beforeUid;
         }
 
         return [] === $criteria ? 'ALL' : implode(' ', $criteria);
